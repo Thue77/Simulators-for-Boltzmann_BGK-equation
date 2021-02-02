@@ -58,7 +58,7 @@ def phi_KD(dt,x0,v0,t,tau,xi,mu,sigma,M,R,v_rv=None):
     x,v,t = __psi_d(xp,t,v_next,theta,xi,mu,sigma,R)
     return x,v,t,v_next
 
-jit_module(nopython=True,nogil=True)
+jit_module(nopython=True,nogil=True, parallel = True)
 
 #For testing purposes
 if __name__ == '__main__':

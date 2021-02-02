@@ -1,11 +1,11 @@
 import numpy as np
+import math
 from .one_step import phi_KD
 from typing import Callable,Tuple
-from numba import jit_module
+from numba import jit_module,njit,prange
 
 '''Method for correlating paths of different levels in the Multilevel Monte Carlo
     method'''
-
 def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray]):
     '''
     dt_f: time step for fine level
@@ -105,7 +105,7 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
         x_k2[index] = x_k2[index] + v_k2[index]*(T-t_k2[index])
     return x_out,x_k2
 
-
+@njit(nogil= True, parallel = True)
 def get_xi(v,x,xi,tau,theta,sigma,R):
     '''
     v: Generated normal numbers for kinetic phases in fine steps not including the first
@@ -127,22 +127,32 @@ def get_xi(v,x,xi,tau,theta,sigma,R):
     return temp
 
 #Needs to be adapted heterogeneous background. Scipy is not part of numba yet
-
+@njit(nogil= True, parallel = True)
 def integral_of_R(R,t_l1,t_l,x,v):
-    '''This function calculates integrals of R from a to b if a<b
-    a,b: numpy arrays of start and end times
     '''
+    This function calculates integrals of R from t_l to t_l1 if t_l<t_l1.
+    This is to calculate exponential numbers for the coarse path.
+    t_l,t_l1: numpy arrays of start and end times
+    '''
+    dx = 1e-6
     index = np.argwhere(t_l1>t_l).flatten()
-    I = np.zeros(len(t_l1),dtype=np.float64)
-    for i in index:
-        I[i] = R(x[i])*(t_l1[i]-t_l[i])#1/v[i]*quad(self.R,x[i],x[i]+v[i]*(t_l1[i]-t_l[i]))[0]
+    I = np.ones(len(t_l1),dtype=np.float64)*math.inf
+    I[index] = np.zeros(len(index))
+    for j in prange(len(index)):
+        i = index[j]
+        start = min(x[i],x[i]+v[i]*(t_l1[i]-t_l[i]))
+        end = max(x[i],x[i]+v[i]*(t_l1[i]-t_l[i]))
+        pos = start
+        while pos < end:
+            I[i] = I[i] + R(pos+dx/2)*dx
+            pos += dx
+        pos = start
     return I
 
 
 def c_np(A,b):
     '''Alternative to np.c_. Needed for numba'''
     return np.vstack((A.T,b.reshape(1,len(b)))).T
-
 
 def isin_np(A,B):
     '''Alternative ti np.isin. Needed for numba'''
@@ -162,4 +172,4 @@ def set_last_nonzero_col(A,index):
         B[i,index[i]] = 0
     return B
 
-jit_module(nopython=True,nogil=True)
+jit_module(nopython=True,nogil=True,parallel=False)

@@ -9,7 +9,7 @@ from typing import Callable,Tuple
 import numpy as np
 import pandas as pd
 import math
-from numba import jit_module
+from numba import njit,jit_module,prange
 import time
 import os
 
@@ -104,7 +104,7 @@ def SC(x,v,e):
             x_new[index_new] = boundaries[bins - (direction>0)]
     return dtau
 
-
+@njit(nogil=True,parallel = True)
 def integral_to_boundary(x,bins,direction,slopes,intercepts):
     '''Calculates integral of R to the boundary in the direction of the velocity.
         only works for B1 and B2
@@ -120,7 +120,8 @@ def integral_to_boundary(x,bins,direction,slopes,intercepts):
     #index to indicate finite integrals
     index = bounds == 1
     I = np.ones(len(x))*math.inf
-    for i in index:
+    for j in prange(len(index)):
+        i = index[j]
         I[i] = abs(x[i]-1)*B[i]+(abs(x[i]-1)*(slopes[bins[i]]*x[i]+intercepts[bins[i]]-B[bins[i]]))/2
     return I
 
@@ -141,6 +142,11 @@ def sigma(x):
 
 def test_numba(x):
     return np.sign(x).astype(np.int64)
+
+# def loop_cor():
+#     '''
+#     loop function for KDML_cor_test_fig_5 to
+#     '''
 
 jit_module(nopython=True,nogil=True)
 
@@ -206,6 +212,7 @@ def KD_cor_test_fig_4(N):
     sns.kdeplot(data=dist, x="x")
     plt.show()
 
+@njit(nogil=True,parallel=True)
 def KDML_cor_test_fig_5(N):
     '''
     epsilon is irrelevant
@@ -213,16 +220,20 @@ def KDML_cor_test_fig_5(N):
     test = 'figure 5'
     set a and b as desired
     '''
-    V_d = []
-    V = []
     dt_list = 1/2**np.arange(0,16,1)
+    V = np.zeros(len(dt_list))
+    V_d = np.zeros(len(dt_list)-1)
     x0,v0,v_l1_next = Q(N)
-    for i in range(len(dt_list)-1):
+    for i in prange(len(dt_list)-1):
         x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC)
-        print(dt_list[i])
-        V_d += [np.var(x_f-x_c)]
-        V += [np.var(x_c)]
-        if i == len(dt_list)-2: V += [np.var(x_f)]
+        V_d[i] = np.var(x_f-x_c)
+        V[i] = np.var(x_c)
+        if i == len(dt_list)-2: V[i+1] = np.var(x_f)
+    return V,V_d
+
+
+def plot_var(V,V_d):
+    dt_list = 1/2**np.arange(0,16,1)
     plt.plot(dt_list[:-1],V_d,':', label = f'a={a}')
     plt.plot(dt_list,V,'--',color = plt.gca().lines[-1].get_color())
     plt.title(f'b = {b}, type: {type}')
@@ -270,8 +281,11 @@ if __name__ == '__main__':
     # print(f'Outside: {R(10)}')
     # KDMC_test_fig_4(500_000)
     # KD_cor_test_fig_4(100_000)
-    KDML_cor_test_fig_5(100)
-
+    print('Starting')
+    start = time.time()
+    V,V_d = KDML_cor_test_fig_5(100_000)
+    print(f'elapsed time is {time.time()-start}')
+    plot_var(V,V_d)
 
 
     # print(test_numba(np.array([1,-2,3,4,-5],dtype=np.float64)))
