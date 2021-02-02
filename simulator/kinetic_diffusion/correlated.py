@@ -1,11 +1,11 @@
 import numpy as np
 from .one_step import phi_KD
 from typing import Callable,Tuple
-from numba import njit
+from numba import jit_module
 
 '''Method for correlating paths of different levels in the Multilevel Monte Carlo
     method'''
-@njit
+
 def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray]):
     '''
     dt_f: time step for fine level
@@ -105,7 +105,7 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
         x_k2[index] = x_k2[index] + v_k2[index]*(T-t_k2[index])
     return x_out,x_k2
 
-@njit
+
 def get_xi(v,x,xi,tau,theta,sigma,R):
     '''
     v: Generated normal numbers for kinetic phases in fine steps not including the first
@@ -127,7 +127,7 @@ def get_xi(v,x,xi,tau,theta,sigma,R):
     return temp
 
 #Needs to be adapted heterogeneous background. Scipy is not part of numba yet
-@njit
+
 def integral_of_R(R,t_l1,t_l,x,v):
     '''This function calculates integrals of R from a to b if a<b
     a,b: numpy arrays of start and end times
@@ -138,26 +138,28 @@ def integral_of_R(R,t_l1,t_l,x,v):
         I[i] = R(x[i])*(t_l1[i]-t_l[i])#1/v[i]*quad(self.R,x[i],x[i]+v[i]*(t_l1[i]-t_l[i]))[0]
     return I
 
-@njit
+
 def c_np(A,b):
     '''Alternative to np.c_. Needed for numba'''
     return np.vstack((A.T,b.reshape(1,len(b)))).T
 
-@njit
+
 def isin_np(A,B):
     '''Alternative ti np.isin. Needed for numba'''
     return np.array([a in B for a in A])
-@njit
+
 def get_last_nonzero_col(A):
     '''Get last nonzero column from 2d array'''
     I = A!=0
     index_col = np.array([np.sum(a)-1 for a in I])
     return np.array([A[i,index_col[i]] for i in range(A.shape[0])]),index_col
 
-@njit
+
 def set_last_nonzero_col(A,index):
     '''Set last nonzero column to zero'''
     B = A.copy()
     for i in range(A.shape[0]):
         B[i,index[i]] = 0
     return B
+
+jit_module(nopython=True,nogil=True)

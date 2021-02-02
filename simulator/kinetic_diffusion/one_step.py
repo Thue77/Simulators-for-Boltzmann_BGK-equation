@@ -1,51 +1,19 @@
 import numpy as np
 from typing import Callable,Tuple
-# from scipy.misc import derivative
-from numba import njit
-    #The kinetic operator. Moves the particle(s) according to the kinetic algorithm by a distance of dt
-def __psi_k_old(dt,v0,x0,tau,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray]) -> Tuple[np.ndarray,np.ndarray,np.ndarray,np.ndarray]:
-    '''
-    dtau: time to first collision for each path. The length should correspond
-         to the number of paths to simulate
-    dt: time increment to simulate
-    v0: initial velocity
-    x0: initial position.
-    mu: mean of post-collisional distribution
-    sigma: standard deviation of post-collisional distribution
-    M: post-collisional distribution
-    SC: method for obtaining the next collision times
-    '''
-    v = v0.copy()
-    x = x0.copy()
-    tau_out = np.zeros(len(v0))
-    t = np.zeros(len(v0))
-    I = np.ones(len(v0))
-    index = np.argwhere(I).flatten() #Indexes for particles that are still moving
-    while True:
-        tau = np.minimum(dtau,dt-t[index]) #Next time point for each particle
-        x[index] = x[index] + v[index]*tau #The position needs to be known for the sampling of v and dtau
-        if any(tau == dt-t[index]):
-            tau_out[index[tau == dt-t[index]]] = tau[tau == dt-t[index]] - tau[tau == dt-t[index]] #Save the next collision time after dt for paths that are done
-        t[index] = t[index]+tau
-        I = t < dt
-        index = np.argwhere(I).flatten() #Indexes for particles that are still moving
-        if all(I==0):
-            break #Break if all particles have moved to the end of the current step
-        #Sample for active paths
-        v[index] = mu(x[index]) + sigma(x[index])*M(x[index])
-        tau = SC(len(index),x[index],v[index]) #Sample time to next collision for each active particle
-    return x,v,tau_out
+from numba import jit_module
 
-@njit
+
+#Kinetic one-step operator
 def __psi_k(tau,x,v,t):
     return x+v*tau,t+tau
 
-@njit
+
+#Diffusive coefficient
 def __D(x,v,e,theta,mu,sigma,R):
     return 2*sigma(x)**2/(R(x)**2)*(2*(e-1)+R(x)*theta*(e+1))+(v-mu(x))**2/(R(x)**2)*(1-2*R(x)*theta*e-e**2)
 
 #The KD-operator. Moves the particle(s) according to the kinetic-diffusion algorithm by a distance of dt
-@njit
+
 def __psi_d(xp,t,v_next,theta,xi,mu,sigma,R):
     '''
     dt: the time step
@@ -69,7 +37,8 @@ def __psi_d(xp,t,v_next,theta,xi,mu,sigma,R):
     t = t + theta
     return x,v,t
 
-@njit
+
+#Kinetic-diffusion opertor
 def phi_KD(dt,x0,v0,t,tau,xi,mu,sigma,M,R,v_rv=None):
     '''
     dt: step size
@@ -89,7 +58,7 @@ def phi_KD(dt,x0,v0,t,tau,xi,mu,sigma,M,R,v_rv=None):
     x,v,t = __psi_d(xp,t,v_next,theta,xi,mu,sigma,R)
     return x,v,t,v_next
 
-
+jit_module(nopython=True,nogil=True)
 
 #For testing purposes
 if __name__ == '__main__':
