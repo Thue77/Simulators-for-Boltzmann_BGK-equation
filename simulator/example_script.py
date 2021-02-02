@@ -139,7 +139,48 @@ def R(x):
 def SC(x,v,e):
     if type == 'default' or a==0:
         dtau = 1/R(x)*e
-        return dtau
+    else:
+        '''The background is piece wise linear and it is necessary to identify
+            particles that might move accross different pieces, e.g. if
+            x>1 and v<0 then the particle might move below 1 where the collision
+            rate is different'''
+        boundaries = np.array([-np.inf,1,np.inf]) #Bins: (-inf,1] and (1,inf]
+        num_of_bins = np.size(boundaries)-1
+        index = np.arange(0,n,dtype=int)
+        dtau = np.zeros(n)
+        bins = np.array([np.where(p <= boundaries)[0][0] for p in x],dtype=int)
+        direction = np.sign(v).astype(int)
+        '''The lower bound of the integral changes. First it is x, but in
+            succesive iterations it is the lower bound of the current bin'''
+        lb = x.copy()
+        '''Need to subtract previous integrals from exponential number
+            in each iteration and solve for the remainder'''
+        e_remainder = e.copy() #The remainder of e after crossing into new domain
+        '''Need to update position of particle after crossing into new domain'''
+        x_new = x.copy()
+        while len(index)>0:
+            # print(f'e_r = {e_remainder[2]}')
+            '''Determine which bin each particle belongs to, given by index of upper bound'''
+            '''Calculate integral within current bin'''
+            I = np.array([quad(lambda x: self.get_slope(xk)*x + self.get_intercept(xk),xk,boundaries[b-d])[0]/vk if (b-d>0 and b-d<num_of_bins) else np.inf for xk,vk,b,d in zip(lb,v[index],bins,(direction==-1))])
+            index_new_domain = np.argwhere(I <= e_remainder[index]).flatten() #Index for particles that cross into different background
+            # print(f'index_new_domain = {index_new_domain}, \n index = {index}')
+            index_new = index[index_new_domain] #In terms of original number of particles
+            # print(f'index_new = {index_new}')
+            index_same_domain = np.argwhere(I > e_remainder[index]).flatten()
+            alpha = self.get_slope(boundaries[bins[index_same_domain]]); beta = self.get_intercept(boundaries[bins[index_same_domain]])
+            # print(f'x1 = {x[1]}, x4 = {x[4]} \n 1 = {boundaries[bins[index_same_domain]][1]}, 2 = {boundaries[bins[index_same_domain]][2]}')
+            # print(f'alpha1 = {alpha[1]}, alpha4 = {alpha[4]}')
+            index_same = index[index_same_domain]
+            dtau[index_same] = dtau[index_same] + (-alpha*x_new[index_same]-beta + np.sqrt((alpha*x_new[index_same]+beta)**2+2*alpha*v[index_same]*e_remainder[index_same]))/(alpha*v[index_same])
+            dtau[index_new] = dtau[index_new] + (boundaries[bins[index_new_domain]-(direction[index_new_domain]==-1)]-x[index_new])/v[index_new]
+            index = index_new.copy()
+            direction = direction[index_new_domain]
+            bins = bins[index_new_domain] + direction
+            lb = boundaries[bins -1]
+            e_remainder[index_new] = e_remainder[index_new] - I[index_new_domain]
+            x_new[index_new] = boundaries[bins - (direction>0)]
+    return dtau
 
 @njit
 def mu(x):
