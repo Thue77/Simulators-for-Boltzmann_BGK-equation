@@ -287,8 +287,9 @@ if __name__ == '__main__':
             KD_cor_test_fig_4(100_000)
     elif test == 'figure 5' and type == 'B1' or type == 'B2':
         print('Starting')
+        KDML_cor_test_fig_5(10)
         start = time.time()
-        V,V_d = KDML_cor_test_fig_5(10_000)
+        V,V_d = KDML_cor_test_fig_5(100)
         print(f'elapsed time is {time.time()-start}')
         plot_var(V,V_d)
 
