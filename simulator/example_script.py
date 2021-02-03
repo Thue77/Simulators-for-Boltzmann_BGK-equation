@@ -1,4 +1,3 @@
-from plasma_example.plasma import Plasma
 from kinetic_diffusion.one_step import phi_KD,__psi_k
 from kinetic_diffusion.mc import KDMC
 from kinetic_diffusion.correlated import correlated as KD_C
@@ -11,11 +10,13 @@ import pandas as pd
 import math
 from numba import njit,jit_module,prange
 import time
+import sys
 import os
+np.seterr(all='raise')
 
 epsilon = 1
 type = 'B1'
-a = 0; b=1
+a = 5; b=100
 test = 'figure 5'
 
 
@@ -52,8 +53,8 @@ def R(x):
     elif type == 'B1':
         return -b*(a*(x-1)-1)*(x<=1) + b*(a*(x-1)+1)*np.logical_not(x<=1)
 
-#Simpler version of SampleCollision
-
+#Sample Collision
+# @njit(nogil=True,parallel = True)
 def SC(x,v,e):
     if type == 'default' or a==0:
         dtau = 1/R(x)*e
@@ -62,46 +63,50 @@ def SC(x,v,e):
             particles that might move accross different pieces, e.g. if
             x>1 and v<0 then the particle might move below 1 where the collision
             rate is different'''
-        boundaries = np.array([-math.inf,1,math.inf]) #Bins: (-inf,1] and (1,inf]
-        num_of_bins = np.size(boundaries)-1
-        index = np.arange(0,n,dtype=int)
+        n = len(x)
+        boundaries = np.array([-math.inf,1,math.inf],np.float64) #Bins: (-inf,1] and (1,inf]
+        num_of_bins = boundaries.size-1
+        index = np.arange(0,n,dtype=np.int64)
         dtau = np.zeros(n)
-        bins = np.array([np.where(p <= boundaries)[0][0] for p in x],dtype=np.int64)
-        direction = np.sign(v).astype(np.int64)
-        slopes = np.array([-b*a,b*a]) if type=='B1' else np.array([0,b*a])
-        intercepts = np.array([(a+1)*b,(1-a)*b]) if type == 'B1' else np.array([b,(1-a)*b])
-        '''The lower bound of the integral changes. First it is x, but in
-            succesive iterations it is the lower bound of the current bin'''
-        location = x.copy()
+        #The bin is given by the index of the lower boundary
+        '''Indicates which domain each particle belongs to. It is given by the
+            index of the last boundary that is smalle than x'''
+        bins = np.array([np.where(p < boundaries)[0][0] for p in x],dtype=np.int64)-1
+        direction = (v>0).astype(np.int64)-(v<0).astype(np.int64)#np.sign(v).astype(np.int64)
+        slopes = np.array([-b*a,b*a],dtype=np.float64) if type=='B1' else np.array([0,b*a],dtype=np.float64)
+        intercepts = np.array([(a+1)*b,(1-a)*b],dtype=np.float64) if type == 'B1' else np.array([b,(1-a)*b],np.float64)
         '''Need to subtract previous integrals from exponential number
-            in each iteration and solve for the remainder'''
-        e_remainder = e.copy() #The remainder of e after crossing into new domain
+            in each iteration and solve for the remainder. Note the multiplication
+            by v. This is because the integration is done w.r.t. x an not t.'''
+        e_remainder = np.abs(e*v) #The remainder of e after crossing into new domain
         '''Need to update position of particle after crossing into new domain'''
         x_new = x.copy()
+        count=0
         while len(index)>0:
-            # print(f'e_r = {e_remainder[2]}')
+            if count==2:
+                print('WRONG')
             '''Determine which bin each particle belongs to, given by index of upper bound'''
             '''Calculate integral within current bin'''
-            I = integral_to_boundary(location,bins,direction,slopes,intercepts)#np.array([quad(lambda x: self.get_slope(xk)*x + self.get_intercept(xk),xk,boundaries[b-d])[0]/vk if (b-d>0 and b-d<num_of_bins) else np.inf for xk,vk,b,d in zip(lb,v[index],bins,(direction==-1))])
+            I = integral_to_boundary(x_new[index],bins[index],direction[index],slopes,intercepts)
             index_new_domain = np.argwhere(I <= e_remainder[index]).flatten() #Index for particles that cross into different background
-            # print(f'index_new_domain = {index_new_domain}, \n index = {index}')
             index_new = index[index_new_domain] #In terms of original number of particles
-            # print(f'index_new = {index_new}')
             index_same_domain = np.argwhere(I > e_remainder[index]).flatten()
-            alpha = self.get_slope(boundaries[bins[index_same_domain]]); beta = self.get_intercept(boundaries[bins[index_same_domain]])
-            # print(f'x1 = {x[1]}, x4 = {x[4]} \n 1 = {boundaries[bins[index_same_domain]][1]}, 2 = {boundaries[bins[index_same_domain]][2]}')
-            # print(f'alpha1 = {alpha[1]}, alpha4 = {alpha[4]}')
             index_same = index[index_same_domain]
-            alpha = slopes[bins];beta = intercepts[bins]
-            dtau[index_same] = dtau[index_same] + (-alpha*x_new[index_same]-beta + np.sqrt((alpha*x_new[index_same]+beta)**2+2*alpha*v[index_same]*e_remainder[index_same]))/(alpha*v[index_same])
-            dtau[index_new] = dtau[index_new] + (boundaries[bins[index_new_domain]-(direction[index_new_domain]==-1)]-x[index_new])/v[index_new]
+            alpha = slopes[bins[index_same]];beta = intercepts[bins[index_same]]
+            dtau[index_same] = dtau[index_same] + (-alpha*x_new[index_same]-beta + np.sqrt((alpha*x_new[index_same]+beta)**2+2*alpha*v[index_same]*e[index_same]))/(alpha*v[index_same])
+            '''If the particle crosses into a new domain, the time it takes to cross
+                needs to be added to the tau calculated in the new domain'''
+            dtau[index_new] = dtau[index_new] + (1-x[index_new])/v[index_new]
             index = index_new.copy()
-            direction = direction[index_new_domain]
-            bins = bins[index_new_domain] + direction
+            # direction = direction[index_new_domain]
+            bins[index_new] = bins[index_new] + direction[index_new]
             #location becomes the bound of the new domain
-            location = boundaries[bins -1]
+            '''Need to subtract the integral in the old domain from the exponential
+                number'''
             e_remainder[index_new] = e_remainder[index_new] - I[index_new_domain]
-            x_new[index_new] = boundaries[bins - (direction>0)]
+            '''Update x to equal the value of the boundary that it is crossing'''
+            x_new[index_new] = boundaries[bins[index_new] + (direction[index_new]<0)]
+            count +=1
     return dtau
 
 @njit(nogil=True,parallel = True)
@@ -113,16 +118,14 @@ def integral_to_boundary(x,bins,direction,slopes,intercepts):
         slopes: numpy array of slope in each domain
         intercepts: numpy array of intercepts in each domain
     '''
-    #Find where the domain changes
+    #Find function value where the domain changes
     B = slopes*1 + intercepts
-    #other bound of integral. The first bound is the position
-    bounds = bins + (direction==1)
-    #index to indicate finite integrals
-    index = bounds == 1
+    #index indicating finite integrals
+    index = np.argwhere((bins==1)*(direction<0) + (bins==0)*(direction>0)).flatten()
     I = np.ones(len(x))*math.inf
     for j in prange(len(index)):
         i = index[j]
-        I[i] = abs(x[i]-1)*B[i]+(abs(x[i]-1)*(slopes[bins[i]]*x[i]+intercepts[bins[i]]-B[bins[i]]))/2
+        I[i] = abs(x[i]-1)*B[bins[i]]+(abs(x[i]-1)*(slopes[bins[i]]*x[i]+intercepts[bins[i]]-B[bins[i]]))/2
     return I
 
 
@@ -143,10 +146,6 @@ def sigma(x):
 def test_numba(x):
     return np.sign(x).astype(np.int64)
 
-# def loop_cor():
-#     '''
-#     loop function for KDML_cor_test_fig_5 to
-#     '''
 
 jit_module(nopython=True,nogil=True)
 
@@ -225,6 +224,7 @@ def KDML_cor_test_fig_5(N):
     V_d = np.zeros(len(dt_list)-1)
     x0,v0,v_l1_next = Q(N)
     for i in prange(len(dt_list)-1):
+        # print(dt_list[i])
         x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC)
         V_d[i] = np.var(x_f-x_c)
         V[i] = np.var(x_c)
@@ -279,13 +279,19 @@ if __name__ == '__main__':
     # print(f'After recompile of R \n SC= {SC(x,v,e)}, R={R(x)}')
     # a = 4
     # print(f'Outside: {R(10)}')
-    # KDMC_test_fig_4(500_000)
-    # KD_cor_test_fig_4(100_000)
-    print('Starting')
-    start = time.time()
-    V,V_d = KDML_cor_test_fig_5(100_000)
-    print(f'elapsed time is {time.time()-start}')
-    plot_var(V,V_d)
+    if test == 'figure 4' and type == 'default':
+        K = input('Cor or MC?\n')
+        if K == 'MC':
+            KDMC_test_fig_4(500_000)
+        else:
+            KD_cor_test_fig_4(100_000)
+    elif test == 'figure 5' and type == 'B1' or type == 'B2':
+        print('Starting')
+        start = time.time()
+        V,V_d = KDML_cor_test_fig_5(10_000)
+        print(f'elapsed time is {time.time()-start}')
+        plot_var(V,V_d)
+
 
 
     # print(test_numba(np.array([1,-2,3,4,-5],dtype=np.float64)))

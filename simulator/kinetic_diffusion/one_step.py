@@ -13,7 +13,7 @@ def __D(x,v,e,theta,mu,sigma,R):
     return 2*sigma(x)**2/(R(x)**2)*(2*(e-1)+R(x)*theta*(e+1))+(v-mu(x))**2/(R(x)**2)*(1-2*R(x)*theta*e-e**2)
 
 #The KD-operator. Moves the particle(s) according to the kinetic-diffusion algorithm by a distance of dt
-
+#NOT ADAPTED TO HETEROGENOUS BG!!
 def __psi_d(xp,t,v_next,theta,xi,mu,sigma,R):
     '''
     dt: the time step
@@ -54,9 +54,10 @@ def phi_KD(dt,x0,v0,t,tau,xi,mu,sigma,M,R,v_rv=None):
     theta = dt - np.mod(tau,dt)
     '''When correlating paths the r.v. for the next step is given in the Coarse
         step by using the ones from the fine step. In that case v_rv is given'''
-    v_next = mu(xp)+sigma(xp)*M(xp) if v_rv ==None else  mu(xp)+sigma(xp)*v_rv
+    v_norm = M(xp) if v_rv is None else v_rv
+    v_next = mu(xp)+sigma(xp)* v_norm
     x,v,t = __psi_d(xp,t,v_next,theta,xi,mu,sigma,R)
-    return x,v,t,v_next
+    return x,v,t,v_norm
 
 jit_module(nopython=True,nogil=True, parallel = True)
 

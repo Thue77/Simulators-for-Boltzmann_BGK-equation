@@ -1,5 +1,6 @@
 import numpy as np
 import math
+import sys
 from .one_step import phi_KD
 from typing import Callable,Tuple
 from numba import jit_module,njit,prange
@@ -13,7 +14,6 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
     x0: initial position
     v0: initial velocity
     '''
-    # np.random.seed(43)
     n = len(x0)
     '''Output fine variables. t_out is not in the output but it is necessary to
        know which x to save in x_out. Need to save the last x s.t. t+tau>T.
@@ -51,6 +51,9 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
 
             input = np.zeros(n2); input[save_rv2] = x_k1[move[Srv_n]].copy(); x_save = c_np(x_save,input)
             input = np.zeros(n2); input[save_rv2] = theta_k1[save_rv].copy(); theta = c_np(theta,input)
+            e_rv = np.random.exponential(1,size=n);
+            tau_k1[move] = SC(x_k1[move],v_k1[move],e_rv)
+            input = np.zeros(n2); input[save_rv2] = e_rv[save_rv].copy(); e_save = c_np(e_save,input)
 
             '''Find out if any path is beyond the time scope and needs to be
                saved in  the _out variables'''
@@ -64,15 +67,12 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
             n = len(move)
             if n==0:
                 break
-            e_rv = np.random.exponential(1,size=n);
-            tau_k1[move] = SC(x_k1[move],v_k1[move],e_rv)
             '''Determine which r.v. to save'''
             Srv_n = isin_np(move,i2)
             Srv_n2 = isin_np(i2,move)
             save_rv = np.where(Srv_n)[0] #Index w.r.t. n
             save_rv2 = np.where(Srv_n2)[0] #Index w.r.t. n2
             input = np.zeros(n2); input[save_rv2] = tau_k1[move[Srv_n]].copy(); tau = c_np(tau,input)
-            input = np.zeros(n2); input[save_rv2] = e_rv[save_rv].copy(); e_save = c_np(e_save,input)
         n = n_temp
         if n2 > 0:
             Srv_n = isin_np(active,i2); save_rv = np.where(Srv_n)[0] #Index w.r.t. n
@@ -83,6 +83,7 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
             e_k2 = e_old - temp
             xi_k2 = get_xi(v_save[:,1:-1],x_save,xi_save,tau,theta,sigma,R(x_save))
             x_k2[i2],v_k2[i2],t_k2[i2],_ = phi_KD(dt_c,x_k2[i2],v_k2[i2],t_k2[i2],tau_k2[i2],xi_k2,mu,sigma,M,R,v_rv=v_l1_next)# self.S_KD(dt_c,x_k2[i2],v_k2[i2],t_k2[i2],(self.mu(x_k2[i2])+self.sigma(x_k2[i2])*v_l1_next),tau_k2[i2],e_k2,xi_k2)
+            tau_k2[i2] = SC(x_k2[i2],v_k2[i2],e_k2)
         '''Test if any paths are still active'''
         I1 = (t_k1+tau_k1)<T; I2 = (t_k2+tau_k2)<T
         I12 = np.logical_or(I1,I2)
@@ -128,25 +129,27 @@ def get_xi(v,x,xi,tau,theta,sigma,R):
 
 #Needs to be adapted heterogeneous background. Scipy is not part of numba yet
 @njit(nogil= True, parallel = True)
-def integral_of_R(R,t_l1,t_l,x,v):
+def integral_of_R(R,t_c,t_f,x,v):
     '''
     This function calculates integrals of R from t_l to t_l1 if t_l<t_l1.
     This is to calculate exponential numbers for the coarse path.
     t_l,t_l1: numpy arrays of start and end times
     '''
-    dx = 1e-6
-    index = np.argwhere(t_l1>t_l).flatten()
-    I = np.ones(len(t_l1),dtype=np.float64)*math.inf
+    index = np.argwhere(t_c>t_f).flatten()
+    I = np.zeros(len(t_c),dtype=np.float64)
+    sign = np.sign(x+v*(t_c-t_f)-x)
     I[index] = np.zeros(len(index))
     for j in prange(len(index)):
         i = index[j]
-        start = min(x[i],x[i]+v[i]*(t_l1[i]-t_l[i]))
-        end = max(x[i],x[i]+v[i]*(t_l1[i]-t_l[i]))
+        # I[i] = R(x[i])*(t_c[i]-t_f[i])
+        start = min(x[i],x[i]+v[i]*(t_c[i]-t_f[i]))
+        end = max(x[i],x[i]+v[i]*(t_c[i]-t_f[i]))
+        dx = min(1e-6,end-start)
         pos = start
         while pos < end:
             I[i] = I[i] + R(pos+dx/2)*dx
             pos += dx
-        pos = start
+        I[i]=I[i]/v[i]*sign[i]
     return I
 
 
@@ -161,7 +164,7 @@ def isin_np(A,B):
 def get_last_nonzero_col(A):
     '''Get last nonzero column from 2d array'''
     I = A!=0
-    index_col = np.array([np.sum(a)-1 for a in I])
+    index_col = np.array([max(np.sum(a)-1,0) for a in I])
     return np.array([A[i,index_col[i]] for i in range(A.shape[0])]),index_col
 
 
