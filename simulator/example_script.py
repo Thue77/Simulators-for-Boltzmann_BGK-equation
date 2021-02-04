@@ -14,10 +14,12 @@ import sys
 import os
 np.seterr(all='raise')
 
-epsilon = 1
-type = 'B1'
-a = 5; b=100
-test = 'figure 5'
+epsilon = float(sys.argv[1])#1
+type = str(sys.argv[2])#'B1'
+a = float(sys.argv[3])#5
+b=float(sys.argv[4])#100
+test = str(sys.argv[5])#'figure 5'
+print(f'a={a}, b={b},type={type}')
 
 
 '''Methods giving the properties of the plasma'''
@@ -219,7 +221,7 @@ def KDML_cor_test_fig_5(N):
     test = 'figure 5'
     set a and b as desired
     '''
-    dt_list = 1/2**np.arange(0,16,1)
+    dt_list = 1/2**np.arange(0,20,1)
     V = np.zeros(len(dt_list))
     V_d = np.zeros(len(dt_list)-1)
     x0,v0,v_l1_next = Q(N)
@@ -289,9 +291,10 @@ if __name__ == '__main__':
         print('Starting')
         KDML_cor_test_fig_5(10)
         start = time.time()
-        V,V_d = KDML_cor_test_fig_5(100)
+        V,V_d = KDML_cor_test_fig_5(int(sys.argv[6]))
         print(f'elapsed time is {time.time()-start}')
-        plot_var(V,V_d)
+        np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
+        # plot_var(V,V_d)
 
 
 
