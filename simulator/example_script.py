@@ -27,11 +27,13 @@ print(f'a={a}, b={b},type={type}')
 '''Methods giving the properties of the plasma'''
 
 def M(x):
+    np.random.seed(21)
     return np.random.normal(0,1,size=x.size)
 
 #Inintial distribution of position and velocity
 
 def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
+    np.random.seed(21)
     if test == 'figure 4':
         # np.random.seed(4208)
         U = np.random.uniform(0,1,size=N)
@@ -89,6 +91,7 @@ def SC(x,v,e):
             in each iteration and solve for the remainder. Note the multiplication
             by v. This is because the integration is done w.r.t. x an not t.'''
         e_remainder = np.abs(e*v) #The remainder of e after crossing into new domain
+        e_local = e.copy()
         '''Need to update position of particle after crossing into new domain'''
         x_new = x.copy()
         count=0
@@ -103,7 +106,7 @@ def SC(x,v,e):
             index_same_domain = np.argwhere(I > e_remainder[index]).flatten()
             index_same = index[index_same_domain]
             alpha = slopes[bins[index_same]];beta = intercepts[bins[index_same]]
-            dtau[index_same] = dtau[index_same] + (-alpha*x_new[index_same]-beta + np.sqrt((alpha*x_new[index_same]+beta)**2+2*alpha*v[index_same]*e[index_same]))/(alpha*v[index_same])
+            dtau[index_same] = dtau[index_same] + (-alpha*x_new[index_same]-beta + np.sqrt((alpha*x_new[index_same]+beta)**2+2*alpha*v[index_same]*e_local[index_same]))/(alpha*v[index_same])
             '''If the particle crosses into a new domain, the time it takes to cross
                 needs to be added to the tau calculated in the new domain'''
             dtau[index_new] = dtau[index_new] + (1-x[index_new])/v[index_new]
@@ -114,6 +117,7 @@ def SC(x,v,e):
             '''Need to subtract the integral in the old domain from the exponential
                 number'''
             e_remainder[index_new] = e_remainder[index_new] - I[index_new_domain]
+            e_local[index_new] = e_local[index_new]-I[index_new_domain]/np.abs(v[index_new])
             '''Update x to equal the value of the boundary that it is crossing'''
             x_new[index_new] = boundaries[bins[index_new] + (direction[index_new]<0)]
             count +=1
@@ -121,12 +125,15 @@ def SC(x,v,e):
 
 # @njit(nogil=True,parallel = True)
 def integral_to_boundary(x,bins,direction,slopes,intercepts):
-    '''Calculates integral of R to the boundary in the direction of the velocity.
-        only works for B1 and B2
+    '''
+    Calculates integral of R to the boundary in the direction of the velocity.
+    only works for B1 and B2. Integral is always positive. The affect of the
+    sign of v has been removed
 
-        boundaries: numpy array of boundaries for all domains
-        slopes: numpy array of slope in each domain
-        intercepts: numpy array of intercepts in each domain
+
+    boundaries: numpy array of boundaries for all domains
+    slopes: numpy array of slope in each domain
+    intercepts: numpy array of intercepts in each domain
     '''
     #Find function value where the domain changes
     B = slopes*1 + intercepts
@@ -157,12 +164,13 @@ def test_numba(x):
     return np.sign(x).astype(np.int64)
 
 
-jit_module(nopython=True,nogil=True)
+# jit_module(nopython=True,nogil=True)
 
 '''Tests'''
 
 def KDMC_test_fig_4_one_step(N,epsilon):
         BG = Plasma(mu=lambda x:0,sigma=lambda x:1/epsilon,epsilon=epsilon)
+        np.random.seed(21)
         x0,v0,_ = BG.Q(N)
         dt = 1
         t = 0
@@ -221,7 +229,7 @@ def KD_cor_test_fig_4(N):
     sns.kdeplot(data=dist, x="x")
     plt.show()
 
-@njit(nogil=True,parallel=True)
+# @njit(nogil=True,parallel=True)
 def KDML_cor_test_fig_5(N):
     '''
     epsilon is irrelevant
@@ -235,15 +243,25 @@ def KDML_cor_test_fig_5(N):
     n = int(N/cache) if N>cache else N
     V = np.zeros((runs,len(dt_list)))#; E = np.zeros(len(dt_list))
     V_d = np.zeros((runs,len(dt_list)-1))#; E_bias = np.zeros(len(dt_list)-1)
-    for r in prange(runs):
-        x0,v0,v_l1_next = Q(n)
+    if runs >1:
+        for r in prange(runs):
+            x0,v0,v_l1_next = Q(n)
+            for i in prange(len(dt_list)-1):
+                # print(dt_list[i])
+                x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC,R_anti=R_anti)
+                V_d[r,i] = np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
+                V[r,i] = np.sum((x_c-np.mean(x_c))**2)
+                if i == len(dt_list)-2: V[r,i+1] = np.sum((x_f-np.mean(x_f))**2)
+        return compute_mean_alongaxis(V)/(N-1),compute_mean_alongaxis(V_d)/(N-1)
+    else:
+        x0,v0,v_l1_next = Q(N)
         for i in prange(len(dt_list)-1):
             # print(dt_list[i])
             x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC,R_anti=R_anti)
-            V_d[r,i] = np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
-            V[r,i] = np.sum((x_c-np.mean(x_c))**2)
-            if i == len(dt_list)-2: V[r,i+1] = np.sum((x_f-np.mean(x_f))**2)
-    return compute_mean_alongaxis(V)/(N-1),compute_mean_alongaxis(V_d)/(N-1)
+            V_d[0,i] = np.var(x_f-x_c)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
+            V[0,i] = np.var(x_c)#np.sum((x_c-np.mean(x_c))**2)
+            if i == len(dt_list)-2: V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
+        return V[0,:]/(N-1),V_d[0,:]/(N-1)
 
 # @njit(nogil=True,parallel=True)
 # compute_var_alongaxis(S,E):
@@ -259,7 +277,7 @@ def KDML_cor_test_fig_5(N):
 #             SS[j] = SS[j] +(S[i,j]-E[j])*()
 
 
-@njit(nogil=True,parallel=True)
+# @njit(nogil=True,parallel=True)
 def compute_mean_alongaxis(A,axis=0):
     '''If axis is zero then the mean of each coulmn is calculated'''
     n = A.shape[axis]
@@ -333,7 +351,7 @@ if __name__ == '__main__':
         print(f'elapsed time is {time.time()-start}')
         # np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
         # print(f'V: {V}')
-        plot_var(V,V_d)
+        # plot_var(V,V_d)
 
 
 

@@ -4,7 +4,7 @@ from scipy.integrate import quad
 
 type = 'B1'
 epsilon=2
-a=5;b=10
+a=1;b=1
 
 def integral_of_R(R,t_c,t_f,x,v):
     '''
@@ -57,14 +57,15 @@ def I_anti(R_anti,t_c,t_f,x,v):
     # #Check if they are in the same domain and that coarse path is ahead of fine path
     index = np.argwhere(np.logical_and((start<=1)==(end<=1),t_c>t_f)).flatten()
     I = np.zeros(len(x))
-    I[index] = R_anti(end[index]) - R_anti(start[index])
+    I[index] = (R_anti(end[index]) - R_anti(start[index]))/np.abs(v[index])
     #Find particles where they move into different domain
     index = np.argwhere(np.logical_and((start<=1)!=(end<=1),t_c>t_f)).flatten()
-    I[index] = (R_anti(end[index])-R_anti(1+1e-15))+(R_anti(1)- R_anti(start[index]))
+    I[index] = ((R_anti(end[index])-R_anti(1+1e-15))+(R_anti(1)- R_anti(start[index])))/np.abs(v[index])
+    print(start); print(end)
     # print(f'start: {start}, end: {end}')
     # print(f'R_anti(start)={R_anti(start)},R_anti(end)={R_anti(end)}')
     # print(f'R_ant(1)= {R_anti(1)}')
-    return I/v#(R_anti(end) - R_anti(start))/np.abs(v)
+    return I#(R_anti(end) - R_anti(start))/np.abs(v)
 
 def compute_mean_alongaxis(A,axis=0):
     '''If axis is zero then the mean of each coulmn is calculated'''
@@ -77,8 +78,8 @@ def compute_mean_alongaxis(A,axis=0):
     return mu
 
 if __name__ == '__main__':
-    x = np.array([0.98,-3]); v = np.array([2,-2]); t_f=np.array([0.3,0.05]);t_c=np.array([0.35,0.08])
+    x = np.array([1.217901707685121,-3]); v = np.array([-1.4764421219954438,-2]); t_f=np.array([0.3,0.05]);t_c=np.array([0.3+0.5242207430263304,0.08])
     # R = lambda x: 6*x+2
     print(f'Scipy integral: {I_R(R,t_c,t_f,x,v)}, my integral: {integral_of_R(R,t_c,t_f,x,v)}, with antiderivative: {I_anti(R_anti,t_c,t_f,x,v)}')
-    A = np.array([[1,2,3,4],[2,3,2,1],[5,3,7,1]])
-    print(f'numpy mean: {np.mean(A,axis=0)}, my mean = {compute_mean_alongaxis(A)}')
+    # A = np.array([[1,2,3,4],[2,3,2,1],[5,3,7,1]])
+    # print(f'numpy mean: {np.mean(A,axis=0)}, my mean = {compute_mean_alongaxis(A)}')

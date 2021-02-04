@@ -18,6 +18,7 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
     '''Output fine variables. t_out is not in the output but it is necessary to
        know which x to save in x_out. Need to save the last x s.t. t+tau>T.
        Then if t<T we need to move x_out by T-t'''
+    np.random.seed(21)
     x_out = x0.copy(); t_out = np.zeros(n); v_out = v0.copy()
     e = np.random.exponential(1,size=n)
     tau_k1 = SC(x0,v0,e); tau_k2 = tau_k1.copy()
@@ -80,6 +81,15 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
             temp = integral_of_R(R,(np.ceil((t_k2[i2]+tau_k2[i2])/dt_c)*dt_c),t_k1[i2],x_k1[i2],mu(x_k1[i2])+sigma(x_k1[i2])*v_l1_next,R_anti)
             e_old,_ = get_last_nonzero_col(e_save)#e_save[range(n2),(e_save!=0).cumsum(1).argmax(1)]#np.choose((e_save!=0).cumsum(1).argmax(1),e_save.T)
             e_k2 = e_old - temp
+            if np.min(e_k2)<0:
+                i = np.where(e_k2<0)[0][0]
+                print(i)
+                print(f'e_old: {e_old[i]}, temp: {temp[i]}')
+                print(f't_c: {(np.ceil((t_k2[i2[i]]+tau_k2[i2[i]])/dt_c)*dt_c)}, t_f: {t_k1[i2[i]]}')
+                print(f'x: {x_k1[i2[i]]}, v: {mu(x_k1[i2[i]])+sigma(x_k1[i2[i]])*v_l1_next[i]}')
+                print(f'tau_f: {tau_k1[i2[i]]}')
+                print(f'tau_c: {tau_k2[i2[i]]}')
+                sys.exit('negative for coarse')
             xi_k2 = get_xi(v_save[:,1:-1],x_save,xi_save,tau,theta,sigma,R(x_save))
             x_k2[i2],v_k2[i2],t_k2[i2],_ = phi_KD(dt_c,x_k2[i2],v_k2[i2],t_k2[i2],tau_k2[i2],xi_k2,mu,sigma,M,R,v_rv=v_l1_next)# self.S_KD(dt_c,x_k2[i2],v_k2[i2],t_k2[i2],(self.mu(x_k2[i2])+self.sigma(x_k2[i2])*v_l1_next),tau_k2[i2],e_k2,xi_k2)
             tau_k2[i2] = SC(x_k2[i2],v_k2[i2],e_k2)
@@ -156,10 +166,10 @@ def integral_of_R(R,t_c,t_f,x,v,R_anti):
         # #Check if they are in the same domain and that coarse path is ahead of fine path
         index = np.argwhere(np.logical_and((start<=1)==(end<=1),t_c>t_f)).flatten()
         I = np.zeros(len(x))
-        I[index] = R_anti(end[index]) - R_anti(start[index])
+        I[index] = (R_anti(end[index]) - R_anti(start[index]))/np.abs(v[index])
         #Find particles where they move into different domain
         index = np.argwhere(np.logical_and((start<=1)!=(end<=1),t_c>t_f)).flatten()
-        I[index] = ((R_anti(end[index])-R_anti(1+1e-15))+(R_anti(1)- R_anti(start[index])))/v[index]
+        I[index] = ((R_anti(end[index])-R_anti(1+1e-15))+(R_anti(1)- R_anti(start[index])))/np.abs(v[index])
     return I
 
 
@@ -185,4 +195,4 @@ def set_last_nonzero_col(A,index):
         B[i,index[i]] = 0
     return B
 
-jit_module(nopython=True,nogil=True,parallel=False)
+# jit_module(nopython=True,nogil=True,parallel=False)
