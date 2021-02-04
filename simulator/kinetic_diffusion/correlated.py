@@ -7,7 +7,7 @@ from numba import jit_module,njit,prange
 
 '''Method for correlating paths of different levels in the Multilevel Monte Carlo
     method'''
-def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray]):
+def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],R_anti = None):
     '''
     dt_f: time step for fine level
     dt_c: time step for coarse level
@@ -54,7 +54,6 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
             e_rv = np.random.exponential(1,size=n);
             tau_k1[move] = SC(x_k1[move],v_k1[move],e_rv)
             input = np.zeros(n2); input[save_rv2] = e_rv[save_rv].copy(); e_save = c_np(e_save,input)
-
             '''Find out if any path is beyond the time scope and needs to be
                saved in  the _out variables'''
             done = np.where(((np.ceil((t_k1[move]+tau_k1[move])/dt_f)*dt_f)>T)*(x_out[move]==x0[move]))[0]
@@ -78,7 +77,7 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
             Srv_n = isin_np(active,i2); save_rv = np.where(Srv_n)[0] #Index w.r.t. n
             v_l1_next,col = get_last_nonzero_col(v_save)#v_save[range(n2),(v_save!=0).cumsum(1).argmax(1)]#np.choose((v_save!=0).cumsum(1).argmax(1),v_save.T)#v_k1[range(len(index_k2)),(v_k1!=0).cumsum(1).argmax(1)]#np.choose((v_k1!=0).cumsum(1).argmax(1),v_k1.T) #Take velocities from fine path for active particles(particles for which the next collision happens before T). Must correspond to the last non-zero contribution. Gives velocity in next coarse step
             v_save = set_last_nonzero_col(v_save,col)
-            temp = integral_of_R(R,(np.ceil((t_k2[i2]+tau_k2[i2])/dt_c)*dt_c),t_k1[i2],x_k1[i2],mu(x_k1[i2])+sigma(x_k1[i2])*v_l1_next)
+            temp = integral_of_R(R,(np.ceil((t_k2[i2]+tau_k2[i2])/dt_c)*dt_c),t_k1[i2],x_k1[i2],mu(x_k1[i2])+sigma(x_k1[i2])*v_l1_next,R_anti)
             e_old,_ = get_last_nonzero_col(e_save)#e_save[range(n2),(e_save!=0).cumsum(1).argmax(1)]#np.choose((e_save!=0).cumsum(1).argmax(1),e_save.T)
             e_k2 = e_old - temp
             xi_k2 = get_xi(v_save[:,1:-1],x_save,xi_save,tau,theta,sigma,R(x_save))
@@ -106,7 +105,7 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
         x_k2[index] = x_k2[index] + v_k2[index]*(T-t_k2[index])
     return x_out,x_k2
 
-@njit(nogil= True, parallel = True)
+# @njit(nogil= True, parallel = True)
 def get_xi(v,x,xi,tau,theta,sigma,R):
     '''
     v: Generated normal numbers for kinetic phases in fine steps not including the first
@@ -128,28 +127,39 @@ def get_xi(v,x,xi,tau,theta,sigma,R):
     return temp
 
 #Needs to be adapted heterogeneous background. Scipy is not part of numba yet
-@njit(nogil= True, parallel = True)
-def integral_of_R(R,t_c,t_f,x,v):
+# @njit(nogil= True, parallel = True)
+def integral_of_R(R,t_c,t_f,x,v,R_anti):
     '''
     This function calculates integrals of R from t_l to t_l1 if t_l<t_l1.
     This is to calculate exponential numbers for the coarse path.
     t_l,t_l1: numpy arrays of start and end times
     '''
-    index = np.argwhere(t_c>t_f).flatten()
-    I = np.zeros(len(t_c),dtype=np.float64)
-    sign = np.sign(x+v*(t_c-t_f)-x)
-    I[index] = np.zeros(len(index))
-    for j in prange(len(index)):
-        i = index[j]
-        # I[i] = R(x[i])*(t_c[i]-t_f[i])
-        start = min(x[i],x[i]+v[i]*(t_c[i]-t_f[i]))
-        end = max(x[i],x[i]+v[i]*(t_c[i]-t_f[i]))
-        dx = min(1e-6,end-start)
-        pos = start
-        while pos < end:
-            I[i] = I[i] + R(pos+dx/2)*dx
-            pos += dx
-        I[i]=I[i]/v[i]*sign[i]
+    if R_anti is None:
+        index = np.argwhere(t_c>t_f).flatten()
+        I = np.zeros(len(t_c),dtype=np.float64)
+        sign = np.sign(x+v*(t_c-t_f)-x)
+        I[index] = np.zeros(len(index))
+        for j in prange(len(index)):
+            i = index[j]
+            # I[i] = R(x[i])*(t_c[i]-t_f[i])
+            start = min(x[i],x[i]+v[i]*(t_c[i]-t_f[i]))
+            end = max(x[i],x[i]+v[i]*(t_c[i]-t_f[i]))
+            dx = min(1e-6,end-start)
+            pos = start
+            while pos < end:
+                I[i] = I[i] + R(pos+dx/2)*dx
+                pos += dx
+            I[i]=I[i]/v[i]*sign[i]
+    else:
+        start = np.minimum(x,x+v*(t_c-t_f))
+        end = np.maximum(x,x+v*(t_c-t_f))
+        # #Check if they are in the same domain and that coarse path is ahead of fine path
+        index = np.argwhere(np.logical_and((start<=1)==(end<=1),t_c>t_f)).flatten()
+        I = np.zeros(len(x))
+        I[index] = R_anti(end[index]) - R_anti(start[index])
+        #Find particles where they move into different domain
+        index = np.argwhere(np.logical_and((start<=1)!=(end<=1),t_c>t_f)).flatten()
+        I[index] = ((R_anti(end[index])-R_anti(1+1e-15))+(R_anti(1)- R_anti(start[index])))/v[index]
     return I
 
 

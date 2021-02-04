@@ -2,6 +2,7 @@ from kinetic_diffusion.one_step import phi_KD,__psi_k
 from kinetic_diffusion.mc import KDMC
 from kinetic_diffusion.correlated import correlated as KD_C
 from kinetic_diffusion.correlated import set_last_nonzero_col
+from AddPaths import Sfunc,delta,x_hat
 import seaborn as sns
 import matplotlib.pyplot as plt
 from typing import Callable,Tuple
@@ -13,6 +14,7 @@ import time
 import sys
 import os
 np.seterr(all='raise')
+
 
 epsilon = float(sys.argv[1])#1
 type = str(sys.argv[2])#'B1'
@@ -48,12 +50,18 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     return x,v,v_norm
 
 #sets the collision rate
-
 def R(x):
     if type == 'default':
         return 1/(epsilon**2)
     elif type == 'B1':
         return -b*(a*(x-1)-1)*(x<=1) + b*(a*(x-1)+1)*np.logical_not(x<=1)
+
+#Anti derivative of R
+def R_anti(x):
+    if type == 'default':
+        return x/(epsilon**2)
+    elif type == 'B1':
+        return (-b*a/2*x**2 + (a+1)*b*x)*(x<=1) + (b*a/2*x**2+(1-a)*b*x)*(x>1)
 
 #Sample Collision
 # @njit(nogil=True,parallel = True)
@@ -111,7 +119,7 @@ def SC(x,v,e):
             count +=1
     return dtau
 
-@njit(nogil=True,parallel = True)
+# @njit(nogil=True,parallel = True)
 def integral_to_boundary(x,bins,direction,slopes,intercepts):
     '''Calculates integral of R to the boundary in the direction of the velocity.
         only works for B1 and B2
@@ -221,21 +229,50 @@ def KDML_cor_test_fig_5(N):
     test = 'figure 5'
     set a and b as desired
     '''
-    dt_list = 1/2**np.arange(0,20,1)
-    V = np.zeros(len(dt_list))
-    V_d = np.zeros(len(dt_list)-1)
-    x0,v0,v_l1_next = Q(N)
-    for i in prange(len(dt_list)-1):
-        # print(dt_list[i])
-        x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC)
-        V_d[i] = np.var(x_f-x_c)
-        V[i] = np.var(x_c)
-        if i == len(dt_list)-2: V[i+1] = np.var(x_f)
-    return V,V_d
+    cache = 10_000
+    dt_list = 1/2**np.arange(0,22,1)
+    runs = int(max(N/cache,1))
+    n = int(N/cache) if N>cache else N
+    V = np.zeros((runs,len(dt_list)))#; E = np.zeros(len(dt_list))
+    V_d = np.zeros((runs,len(dt_list)-1))#; E_bias = np.zeros(len(dt_list)-1)
+    for r in prange(runs):
+        x0,v0,v_l1_next = Q(n)
+        for i in prange(len(dt_list)-1):
+            # print(dt_list[i])
+            x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC,R_anti=R_anti)
+            V_d[r,i] = np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
+            V[r,i] = np.sum((x_c-np.mean(x_c))**2)
+            if i == len(dt_list)-2: V[r,i+1] = np.sum((x_f-np.mean(x_f))**2)
+    return compute_mean_alongaxis(V)/(N-1),compute_mean_alongaxis(V_d)/(N-1)
+
+# @njit(nogil=True,parallel=True)
+# compute_var_alongaxis(S,E):
+#     '''
+#     S: Matrix of sum of squares
+#     E: Matrix of means
+#     '''
+#     n = S.shape[0]
+#     m = S.shape[1]
+#     SS = np.zeros(m)
+#     for j in prange(m):
+#         for i in prange(n):
+#             SS[j] = SS[j] +(S[i,j]-E[j])*()
+
+
+@njit(nogil=True,parallel=True)
+def compute_mean_alongaxis(A,axis=0):
+    '''If axis is zero then the mean of each coulmn is calculated'''
+    n = A.shape[axis]
+    m = A.shape[0] if axis==1 else A.shape[1]
+    mu = np.zeros(m)
+    for j in prange(m):
+        for i in prange(n):
+            mu[j] = mu[j] + 1/(i+1)*(A[i,j]-mu[j])
+    return mu
 
 
 def plot_var(V,V_d):
-    dt_list = 1/2**np.arange(0,16,1)
+    dt_list = 1/2**np.arange(0,22,1)
     plt.plot(dt_list[:-1],V_d,':', label = f'a={a}')
     plt.plot(dt_list,V,'--',color = plt.gca().lines[-1].get_color())
     plt.title(f'b = {b}, type: {type}')
@@ -273,6 +310,7 @@ def kill_numba_cache():
 
 
 if __name__ == '__main__':
+    # os.environ['NUMBA_DISABLE_JIT'] = '1'
     # print(dir(one_step))
     # e = 2; x=5; v = 0;
     # print(f'Before recompile of R \n SC= {SC(x,v,e)}, R={R(x)}')
@@ -293,8 +331,9 @@ if __name__ == '__main__':
         start = time.time()
         V,V_d = KDML_cor_test_fig_5(int(sys.argv[6]))
         print(f'elapsed time is {time.time()-start}')
-        np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
-        # plot_var(V,V_d)
+        # np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
+        # print(f'V: {V}')
+        plot_var(V,V_d)
 
 
 
