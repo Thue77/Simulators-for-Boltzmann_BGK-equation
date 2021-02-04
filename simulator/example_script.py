@@ -27,13 +27,11 @@ print(f'a={a}, b={b},type={type}')
 '''Methods giving the properties of the plasma'''
 
 def M(x):
-    np.random.seed(21)
     return np.random.normal(0,1,size=x.size)
 
 #Inintial distribution of position and velocity
 
 def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
-    np.random.seed(21)
     if test == 'figure 4':
         # np.random.seed(4208)
         U = np.random.uniform(0,1,size=N)
@@ -94,10 +92,7 @@ def SC(x,v,e):
         e_local = e.copy()
         '''Need to update position of particle after crossing into new domain'''
         x_new = x.copy()
-        count=0
         while len(index)>0:
-            if count==2:
-                print('WRONG')
             '''Determine which bin each particle belongs to, given by index of upper bound'''
             '''Calculate integral within current bin'''
             I = integral_to_boundary(x_new[index],bins[index],direction[index],slopes,intercepts)
@@ -120,10 +115,9 @@ def SC(x,v,e):
             e_local[index_new] = e_local[index_new]-I[index_new_domain]/np.abs(v[index_new])
             '''Update x to equal the value of the boundary that it is crossing'''
             x_new[index_new] = boundaries[bins[index_new] + (direction[index_new]<0)]
-            count +=1
     return dtau
 
-# @njit(nogil=True,parallel = True)
+@njit(nogil=True,parallel = True)
 def integral_to_boundary(x,bins,direction,slopes,intercepts):
     '''
     Calculates integral of R to the boundary in the direction of the velocity.
@@ -164,7 +158,7 @@ def test_numba(x):
     return np.sign(x).astype(np.int64)
 
 
-# jit_module(nopython=True,nogil=True)
+jit_module(nopython=True,nogil=True)
 
 '''Tests'''
 
@@ -229,7 +223,7 @@ def KD_cor_test_fig_4(N):
     sns.kdeplot(data=dist, x="x")
     plt.show()
 
-# @njit(nogil=True,parallel=True)
+@njit(nogil=True,parallel=True)
 def KDML_cor_test_fig_5(N):
     '''
     epsilon is irrelevant
@@ -277,7 +271,7 @@ def KDML_cor_test_fig_5(N):
 #             SS[j] = SS[j] +(S[i,j]-E[j])*()
 
 
-# @njit(nogil=True,parallel=True)
+@njit(nogil=True,parallel=True)
 def compute_mean_alongaxis(A,axis=0):
     '''If axis is zero then the mean of each coulmn is calculated'''
     n = A.shape[axis]
@@ -351,7 +345,7 @@ if __name__ == '__main__':
         print(f'elapsed time is {time.time()-start}')
         # np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
         # print(f'V: {V}')
-        # plot_var(V,V_d)
+        plot_var(V,V_d)
 
 
 
