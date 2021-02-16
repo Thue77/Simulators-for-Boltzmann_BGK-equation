@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 A = [0.0,0.1,0.2,0.5,1.0,2.0,5.0,10.0]
-B = [1.0]
+B = [1.0,10.0,100.0,1000.0]
 dt_list = 1/2**np.arange(0,22,1)
 for b in B:
     plt.figure()

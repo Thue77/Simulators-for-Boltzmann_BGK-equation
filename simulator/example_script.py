@@ -257,19 +257,6 @@ def KDML_cor_test_fig_5(N):
             if i == len(dt_list)-2: V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
         return V[0,:]/(N-1),V_d[0,:]/(N-1)
 
-# @njit(nogil=True,parallel=True)
-# compute_var_alongaxis(S,E):
-#     '''
-#     S: Matrix of sum of squares
-#     E: Matrix of means
-#     '''
-#     n = S.shape[0]
-#     m = S.shape[1]
-#     SS = np.zeros(m)
-#     for j in prange(m):
-#         for i in prange(n):
-#             SS[j] = SS[j] +(S[i,j]-E[j])*()
-
 
 @njit(nogil=True,parallel=True)
 def compute_mean_alongaxis(A,axis=0):
@@ -343,9 +330,9 @@ if __name__ == '__main__':
         start = time.time()
         V,V_d = KDML_cor_test_fig_5(int(sys.argv[6]))
         print(f'elapsed time is {time.time()-start}')
-        # np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
+        np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
         # print(f'V: {V}')
-        plot_var(V,V_d)
+        # plot_var(V,V_d)
 
 
 
