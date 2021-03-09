@@ -56,6 +56,12 @@ def R(x):
     elif type == 'B1':
         return -b*(a*(x-1)-1)*(x<=1) + b*(a*(x-1)+1)*np.logical_not(x<=1)
 
+def dR(x):
+    if type == 'default':
+        return 0
+    elif type == 'B1':
+        return (x<=1)*(-b*a) + (x>1)*(b*a)
+
 #Anti derivative of R
 def R_anti(x):
     if type == 'default':
@@ -235,18 +241,22 @@ def KDML_cor_test_fig_5(N):
     dt_list = 1/2**np.arange(0,22,1)
     runs = int(max(N/cache,1))
     n = int(N/cache) if N>cache else N
-    V = np.zeros((runs,len(dt_list)))#; E = np.zeros(len(dt_list))
-    V_d = np.zeros((runs,len(dt_list)-1))#; E_bias = np.zeros(len(dt_list)-1)
+    V = np.zeros((runs,len(dt_list))); E = np.zeros((runs,len(dt_list)))
+    V_d = np.zeros((runs,len(dt_list)-1)); E_bias = np.zeros((runs,len(dt_list)-1))
     if runs >1:
         for r in prange(runs):
             x0,v0,v_l1_next = Q(n)
             for i in prange(len(dt_list)-1):
                 # print(dt_list[i])
-                x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC,R_anti=R_anti)
-                V_d[r,i] = np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
-                V[r,i] = np.sum((x_c-np.mean(x_c))**2)
-                if i == len(dt_list)-2: V[r,i+1] = np.sum((x_f-np.mean(x_f))**2)
-        return compute_mean_alongaxis(V)/(N-1),compute_mean_alongaxis(V_d)/(N-1)
+                x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR)
+                E_bias[r,i] = np.mean(x_f-x_c)
+                V_d[r,i] = np.sum((x_f-x_c-E_bias[r,i])**2)
+                E[r,i] = np.mean(x_c)
+                V[r,i] = np.sum((x_c-E[r,i])**2)
+                if i == len(dt_list)-2:
+                    E[r,i+1] = np.mean(x_f)
+                    V[r,i+1] = np.sum((x_f-E[r,i+1])**2)
+        return add_sum_of_squares_alongaxis(V,E,cache)/(N-1),add_sum_of_squares_alongaxis(V_d,E_bias,cache)/(N-1)
     else:
         x0,v0,v_l1_next = Q(N)
         for i in prange(len(dt_list)-1):
@@ -255,7 +265,7 @@ def KDML_cor_test_fig_5(N):
             V_d[0,i] = np.var(x_f-x_c)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
             V[0,i] = np.var(x_c)#np.sum((x_c-np.mean(x_c))**2)
             if i == len(dt_list)-2: V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
-        return V[0,:]/(N-1),V_d[0,:]/(N-1)
+        return V[0,:],V_d[0,:]
 
 
 @njit(nogil=True,parallel=True)
@@ -268,6 +278,25 @@ def compute_mean_alongaxis(A,axis=0):
         for i in prange(n):
             mu[j] = mu[j] + 1/(i+1)*(A[i,j]-mu[j])
     return mu
+
+@njit(nogil=True,parallel=True)
+def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
+    '''If axis is zero then the mean of each coulmn is calculated
+    A: matrix of sum of squares for each run
+    A_mean: matrix of means for each run
+    N: number of paths used in each run
+    '''
+    n = A.shape[axis]
+    m = A.shape[0] if axis==1 else A.shape[1]
+    ss = np.zeros(m)
+    for j in prange(m):
+        mu_old = 0
+        for i in prange(n):
+            Delta = A_mean[i,j] - mu_old
+            M = (N*(N*(i)))/(N+N*(i))
+            ss[j] = ss[j] + A[i,j] + Delta**2*M
+            mu_old = mu_old + Delta*(N*i)/(N+N*(i))
+    return ss
 
 
 def plot_var(V,V_d):
@@ -330,9 +359,9 @@ if __name__ == '__main__':
         start = time.time()
         V,V_d = KDML_cor_test_fig_5(int(sys.argv[6]))
         print(f'elapsed time is {time.time()-start}')
-        np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
+        # np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
         # print(f'V: {V}')
-        # plot_var(V,V_d)
+        plot_var(V,V_d)
 
 
 

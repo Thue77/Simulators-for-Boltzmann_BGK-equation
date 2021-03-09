@@ -19,7 +19,8 @@ tau2 = np.zeros(numbers)
 for i in range(numbers):
     U = np.random.uniform(0, 1, K)
     T = dt*np.sort(U)
-    tau2[i] = T[5]-T[4]
+    tau2[i] = T[5] -T[4]
+
 
 def tau_K(K,dt,t):
     return K*(dt-t)**(K-1)/dt**K

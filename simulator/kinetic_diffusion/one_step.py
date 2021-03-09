@@ -10,11 +10,18 @@ def __psi_k(tau,x,v,t):
 
 #Diffusive coefficient
 def __D(x,v,e,theta,mu,sigma,R):
-    return 2*sigma(x)**2/(R(x)**2)*(2*(e-1)+R(x)*theta*(e+1))+(v-mu(x))**2/(R(x)**2)*(1-2*R(x)*theta*e-e**2)
+    return sigma(x)**2/(theta*R(x)**2)*(2*(e-1)+R(x)*theta*(e+1))+(v-mu(x))**2/(2*theta*R(x)**2)*(1-2*R(x)*theta*e-e**2)
+
+#Derivative of diffusion coefficient w.r.t. R
+def dDdR(x,v,e,theta,mu,sigma,R):
+    #Derivative of first term:
+    D1 = (sigma(x)**2/(R(x)**2)*(1-e-R(x)*theta*e)  -2*sigma(x)**2/(theta*R(x)**3)*(R(x)*theta+2*e-2+R(x)*theta*e))
+    D2 = (v-mu(x))**2*(1/(2*R(x)**2)*(2*e**2-2*e+2*R(x)*theta*e)-1/(theta*R(x)**3)*(1-e**2-2*R(x)*theta*e))
+    return D1+D2
 
 #The KD-operator. Moves the particle(s) according to the kinetic-diffusion algorithm by a distance of dt
 #NOT ADAPTED TO HETEROGENOUS BG!!
-def __psi_d(xp,t,v_next,theta,xi,mu,sigma,R):
+def __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=None):
     '''
     dt: the time step
     v0: initial velocity for kinetc part of the step
@@ -26,20 +33,20 @@ def __psi_d(xp,t,v_next,theta,xi,mu,sigma,R):
     n = len(xp)
     # dt = np.ones(n)*dt
     # theta = dt - np.mod(tau,dt)
-    x_pp = xp + mu(xp)*theta/2 #Intermediate point to deal with heterogenity
+    x_pp = xp# + mu(xp)*theta/2 #Intermediate point to deal with heterogenity
     v = v_next.copy() #Velocity of kinetic phase in next step. Drawn at the position of the collision
     e = np.exp(-R(x_pp)*theta)
-    dVdx_r = 0#derivative(__D,x_pp,dx=1e-6,args = (v,e,theta,mu,sigma,R))
-    Edx = mu(x_pp)*theta + (v-mu(x_pp))*1/R(x_pp)*(1-e) + 0.5*dVdx_r #Equation 31
-    Vdx = __D(x_pp,v,e,theta,mu,sigma,R)
-    Vdx = np.maximum(Vdx,0) #To avoid numerical errors
-    x = xp + Edx + np.sqrt(Vdx)*xi #Update postion by diffusive motion
+    dDdR_dRdx = np.zeros(n) if dR is None else dDdR(x_pp,v,e,theta,mu,sigma,R)*dR(x_pp)
+    A = mu(x_pp) + (v-mu(x_pp))*1/(theta*R(x_pp))*(1-e) + dDdR_dRdx #Equation 31
+    D = __D(x_pp,v,e,theta,mu,sigma,R)
+    D = np.maximum(D,0) #To avoid numerical errors
+    x = xp + A*theta + np.sqrt(2*D*theta)*z #Update postion by diffusive motion
     t = t + theta
     return x,v,t
 
 
 #Kinetic-diffusion opertor
-def phi_KD(dt,x0,v0,t,tau,xi,mu,sigma,M,R,v_rv=None):
+def phi_KD(dt,x0,v0,t,tau,z,mu,sigma,M,R,v_rv=None,dR=None):
     '''
     dt: step size
     x0: initial positions
@@ -56,7 +63,7 @@ def phi_KD(dt,x0,v0,t,tau,xi,mu,sigma,M,R,v_rv=None):
         step by using the ones from the fine step. In that case v_rv is given'''
     v_norm = M(xp) if v_rv is None else v_rv
     v_next = mu(xp)+sigma(xp)* v_norm
-    x,v,t = __psi_d(xp,t,v_next,theta,xi,mu,sigma,R)
+    x,v,t = __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=dR)
     return x,v,t,v_norm
 
 jit_module(nopython=True,nogil=True, parallel = True)
