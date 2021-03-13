@@ -2,6 +2,7 @@ from kinetic_diffusion.one_step import phi_KD,__psi_k
 from kinetic_diffusion.mc import KDMC
 from kinetic_diffusion.correlated import correlated as KD_C
 from kinetic_diffusion.correlated import set_last_nonzero_col
+from kinetic_diffusion.ml import warm_up
 from AddPaths import Sfunc,delta,x_hat
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -21,16 +22,16 @@ type = str(sys.argv[2])#'B1'
 a = float(sys.argv[3])#5
 b=float(sys.argv[4])#100
 test = str(sys.argv[5])#'figure 5'
+N_global = int(sys.argv[6])
 print(f'a={a}, b={b},type={type}')
 
 
-'''Methods giving the properties of the plasma''' 
+'''Methods giving the properties of the plasma'''
 
 def M(x):
     return np.random.normal(0,1,size=x.size)
 
 #Inintial distribution of position and velocity
-
 def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     if test == 'figure 4':
         # np.random.seed(4208)
@@ -43,7 +44,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v_norm = np.append(np.random.normal(0,1,size = len(index)),np.random.normal(0,1,size = N-len(index)))
         v[index] = (v_norm[0:len(index)] + 10)
         v[index_not] = (v_norm[len(index):]-10)
-    elif test == 'figure 5':
+    elif test == 'figure 5' or test == 'warm_up':
         x = np.ones(N)
         v_norm = np.random.normal(0,1,size=N)
         v = mu(x) + sigma(x)*v_norm
@@ -149,14 +150,14 @@ def integral_to_boundary(x,bins,direction,slopes,intercepts):
 def mu(x):
     if test == 'figure 4':
         return 0
-    elif test == 'figure 5':
+    elif test == 'figure 5' or test == 'warm_up':
         return 0
 
 
 def sigma(x):
     if test == 'figure 4':
         return 1/epsilon
-    elif test == 'figure 5':
+    elif test == 'figure 5' or test == 'warm_up':
         return 1
 
 
@@ -357,11 +358,18 @@ if __name__ == '__main__':
         print('Starting')
         KDML_cor_test_fig_5(10)
         start = time.time()
-        V,V_d = KDML_cor_test_fig_5(int(sys.argv[6]))
+        V,V_d = KDML_cor_test_fig_5(N_global)
         print(f'elapsed time is {time.time()-start}')
         np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
         # print(f'V: {V}')
         # plot_var(V,V_d)
+    elif test == 'warm_up' and type == 'B1' or type == 'B2':
+        L = 15; t0 = 0; T = 1
+        Q_l,Q_l_L,V_l,V_l_L,C_l,C_l_L = warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR)
+        plt.plot(1/2**np.arange(1,L+1),V_l_L)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.show()
 
 
 
