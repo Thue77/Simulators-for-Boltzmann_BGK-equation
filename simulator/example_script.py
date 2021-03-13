@@ -24,7 +24,7 @@ test = str(sys.argv[5])#'figure 5'
 print(f'a={a}, b={b},type={type}')
 
 
-'''Methods giving the properties of the plasma'''
+'''Methods giving the properties of the plasma''' 
 
 def M(x):
     return np.random.normal(0,1,size=x.size)
@@ -240,7 +240,7 @@ def KDML_cor_test_fig_5(N):
     cache = 10_000
     dt_list = 1/2**np.arange(0,22,1)
     runs = int(max(N/cache,1))
-    n = int(N/cache) if N>cache else N
+    n = cache#int(N/cache) if N>cache else N
     V = np.zeros((runs,len(dt_list))); E = np.zeros((runs,len(dt_list)))
     V_d = np.zeros((runs,len(dt_list)-1)); E_bias = np.zeros((runs,len(dt_list)-1))
     if runs >1:
@@ -359,9 +359,9 @@ if __name__ == '__main__':
         start = time.time()
         V,V_d = KDML_cor_test_fig_5(int(sys.argv[6]))
         print(f'elapsed time is {time.time()-start}')
-        # np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
+        np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
         # print(f'V: {V}')
-        plot_var(V,V_d)
+        # plot_var(V,V_d)
 
 
 
