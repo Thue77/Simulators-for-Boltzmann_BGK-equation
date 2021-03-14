@@ -106,63 +106,8 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
         x_k2[index] = x_k2[index] + v_k2[index]*(T-t_k2[index])
     return x_out,x_k2
 
-# 
-# '''Calculates only the coarse paths when the r.v. when the fine path is given. Allows for nested simulations of correlated paths'''
-# def nested_corr(dt,t0,T,x0,v0,x_all,theta_all,xi_all,v_all,e_all,tau_all,t_all):
-#     paths,steps = np.shape(x_all)
-#     t = np.ones(paths)*t0
-#     tau = tau_all[:,0].copy()
-#     v = v0.copy(); x = x0.copy()
-#     I = t + tau < T
-#     index = np.argwhere(I).flatten()
-#     active = np.sum(I)
-#     current_col = np.zeros(active,dtype=int)
-#     count=0
-#     while active > 0:
-#         '''Determine which r.v. to use in this step for each path'''
-#         next_time = np.ceil((t[index]+tau[index])/dt)*dt
-#         I_rv = ((t_all[index,:]+tau_all[index,:]).T >= next_time).T
-#         next_col = np.fromiter((np.argwhere(r)[0][0] for r in I_rv),dtype=int) #Need to use every r.v between current_col and next_col for each row
-#         next_col = np.maximum(next_col,current_col) + (next_col <= current_col) #At least 1 fine step must be used to move coarse particle
-#         v_l1_next = v_all[index,next_col]#v_k1[range(len(index_k2)),(v_k1!=0).cumsum(1).argmax(1)] #np.choose((v_k1!=0).cumsum(1).argmax(1),v_k1.T) #Take velocities from fine path for active particles(particles for which the next collision happens before T). Must correspond to the last non-zero contribution. Gives velocity in next coarse step
-#         '''Calculate integral to subtract from e'''
-#         e = e_all[index,next_col] - self.integral_of_R(next_time,t_all[index,next_col],x_all[index,next_col],v_l1_next) #e_k1[range(n),(e_k1!=0).cumsum(1).argmax(1)]#np.choose((e_k1!=0).cumsum(1).argmax(1),e_k1.T) #For determining collision in next step(not this step)
-#         v_k1 = self.get_col_for_step(current_col,next_col,v_all[index,:])[:,1:]
-#         x_list = self.get_col_for_step(current_col,next_col,x_all[index,:])
-#         theta = self.get_col_for_step(current_col,next_col,theta_all[index,:])
-#         tau_instep = self.get_col_for_step(current_col,next_col,tau_all[index,:])[:,1:]
-#         xi_k1 = self.get_col_for_step(current_col,next_col,xi_all[index,:])
-#
-#         if x_list.shape[1]==0:
-#             print('index: ',index)
-#             print('t: ',t[index])
-#             print('next: ',next_time)
-#             print('t_all: ',t_all[index,next_col])
-#             print('current_col: ',current_col)
-#             print('next_col: ',next_col)
-#             print(f'add {(next_col <= current_col)}')
-#         xi = self.get_xi(v_k1,x_list,xi_k1,tau_instep,theta,self.R(x_list))
-#         x[index],v[index],t[index],tau[index],theta = self.S_KD(dt,x[index],v[index],t[index],(self.mu(x[index])+self.sigma(x[index])*v_l1_next),tau[index],e,xi)
-#         I = t + tau < self.t_end
-#         index_old = index.copy()
-#         index = np.argwhere(I).flatten()
-#         active = np.sum(I)
-#         current_col = next_col[np.where(np.isin(index_old,index))[0]].copy()
-#         count+=1
-#     I = t < self.t_end
-#     if np.sum(I)>0:
-#         index = np.argwhere(I).flatten()
-#         x[index] = x[index] + v[index]*(self.t_end-t[index])
-#     return x
-#
-# def get_col_for_step(start,end,array):
-#     '''array: should be 2d'''
-#     r = np.shape(array)[0]
-#     c = np.max(end-start)
-#     out = np.zeros((r,c))
-#     for i,interval in enumerate(zip(start,end)):
-#         out[i,range(interval[1]-interval[0])] = array[i,range(interval[0],interval[1])]
-#     return out
+
+ 
 
 @njit(nogil= True, parallel = True)
 def get_xi(v,x,xi,tau,theta,sigma,R):

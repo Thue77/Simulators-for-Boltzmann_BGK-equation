@@ -39,37 +39,49 @@ def warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
 
 
 @njit(nogil=True)
-def select_levels(V,V_d):
+def select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
     '''
     V: array of variances. Length L+1
     V_d: array of variances of bias. Length L
+    output:
+    let l be in levels[1:]. Then dt^f = 1/2**l.
+    for l=levels[0], dt = 1/2**l
     '''
+    Q_est,Q_d,V,V_d,C,C_d = warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N)
     l = 1
     test = V_d > V[1:]
     if np.sum(test)>1:
         l = np.argwhere(test).flatten()[-1]+2 #Last index where variance of bias is larger than V
-    L = [l-1,l]
+    levels = [l-1,l]
     V_min = V_d[max(l-2,0)]
     for j in range(l,len(V_d)):
         if V_d[j]<V_min/2:
-            L += [j]
+            levels += [j]
             V_min = V_d[j]
-    return L
-
-
-
-def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None,L=14,N_warm = 100):
-    Q_l,Q_l_l1,V_l,V_l_l1,C_l,C_l_l1 = warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N)
-    N  = np.ones(len(levels))*N_warm #Number of paths used on each level
-    levels = select_levels(V_l,V_l_l1) #levels to be used
-    Q = np.empty(len(levels)) #List of ML estimates for each level
-    V = np.empty(len(levels)) #Variances of estimates on each level
-    C = np.empty(len(levels)) #Cost of estimates on each level
-    '''When using results from the warm-up it is important to note that for levels
-    where the next one is not the adjecant level, the value has not been calculated yet'''
-    '''Set values for warm start of multilevel scheme'''
-    Q[0] = Q_l[levels[0]]; V[0] = V_l[levels[0]]; C[0] = C_l[levels[0]] #Values for first level
+    L_set = np.array(levels)
+    '''Set up output variables based on level selection and set values of non adjecant levels to zero'''
+    Q_out = np.empty(len(levels)) #List of ML estimates for each level
+    V_out = np.empty(len(levels)) #Variances of estimates on each level
+    C_out = np.empty(len(levels)) #Cost of estimates on each level
+    Q_out[0] = Q_est[levels[0]]; V_out[0] = V[levels[0]]; C_out[0] = C[levels[0]] #Values for first level
     '''Note that len(Q_l_l1)=L and len(Q_l)=L+1. So the first value in Q_l_l1 is Q_{1,0}.
     Hence, if level 2 and 3 are included we want Q_{3,2}, which is at Q_l_l1[2]
     '''
-    Q[1:] = Q_l_l1[levels[1:]-1]; V[0] = V_l_l1[levels[1:]-1]; C[0] = C_l_l1[levels[1:]-1] #Values for other levels
+    '''First determine jumps in levels'''
+    jumps = np.where(diff_np(L_set)>1)[0] #index for jumps in terms of correlated results
+    Q_temp = Q_d[L_set[1:]-1]; V_temp = V_d[L_set[1:]-1]; C_temp = C_d[L_set[1:]-1]
+    '''No results are available for non-adjecant levels. So they are set to 0'''
+    Q_temp[jumps] = 0; V_temp[jumps] = 0; C_temp[jumps] = 0;
+    '''Insert in output variables'''
+    Q_out[1:] = Q_temp; V_out[1:] = V_temp; C_out[1:] = C_temp; #Values for other levels
+    '''Set number of paths for each level'''
+    N_out = N*np.where(C_out > 0)[0]
+    return levels,N_out,Q_out,V_out,C_out
+
+@njit(nogil=True)
+def diff_np(a):
+    return a[1:]-a[:-1]
+
+def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None,L=14,N_warm = 100):
+    '''First do warm-up and select levels with L being the maximum level'''
+    levels,N,X,V,C = select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N_warm,tau)

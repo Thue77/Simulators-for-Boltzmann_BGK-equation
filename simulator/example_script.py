@@ -44,7 +44,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v_norm = np.append(np.random.normal(0,1,size = len(index)),np.random.normal(0,1,size = N-len(index)))
         v[index] = (v_norm[0:len(index)] + 10)
         v[index_not] = (v_norm[len(index):]-10)
-    elif test == 'figure 5' or test == 'warm_up':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels':
         x = np.ones(N)
         v_norm = np.random.normal(0,1,size=N)
         v = mu(x) + sigma(x)*v_norm
@@ -150,14 +150,14 @@ def integral_to_boundary(x,bins,direction,slopes,intercepts):
 def mu(x):
     if test == 'figure 4':
         return 0
-    elif test == 'figure 5' or test == 'warm_up':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels':
         return 0
 
 
 def sigma(x):
     if test == 'figure 4':
         return 1/epsilon
-    elif test == 'figure 5' or test == 'warm_up':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels':
         return 1
 
 
@@ -310,16 +310,16 @@ def test_warm_up(N=100,L=21):
 
 
 def test_level_selection():
-    data = np.loadtxt(f'var_a_{a}_b_{b}_type_{type}.txt')
-    V = data[0]
-    V_d = data[1]
-    L = select_levels(V,V_d[:-1])
-    dt_list = 1/2**np.arange(1,len(V_d),1)
-    plt.plot(dt_list,V_d[:-1],':')
-    plt.plot(dt_list[L],V_d[L],':')
+    # data = np.loadtxt(f'var_a_{a}_b_{b}_type_{type}.txt')
+    L = 21; t0 = 0; T = 1
+    levels,N,X,V,C = select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N=100,tau=None)
+    dt_list = 1/2**np.arange(1,L+1)
+    # plt.plot(dt_list,V_d[:-1],':')
+    plt.plot(dt_list[levels],V,':')
     plt.xscale('log')
     plt.yscale('log')
     plt.show()
+    print(f'levels: {levels}')
 
 
 '''Exists in separate file as well'''
