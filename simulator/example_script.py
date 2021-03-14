@@ -310,11 +310,9 @@ def test_warm_up(N=100,L=21):
 
 
 def test_level_selection():
-    print('Here')
     data = np.loadtxt(f'var_a_{a}_b_{b}_type_{type}.txt')
     V = data[0]
     V_d = data[1]
-    print(len(V_d))
     L = select_levels(V,V_d[:-1])
     dt_list = 1/2**np.arange(1,len(V_d),1)
     plt.plot(dt_list,V_d[:-1],':')

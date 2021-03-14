@@ -55,3 +55,21 @@ def select_levels(V,V_d):
             L += [j]
             V_min = V_d[j]
     return L
+
+
+
+def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None,L=14,N_warm = 100):
+    Q_l,Q_l_l1,V_l,V_l_l1,C_l,C_l_l1 = warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N)
+    N  = np.ones(len(levels))*N_warm #Number of paths used on each level
+    levels = select_levels(V_l,V_l_l1) #levels to be used
+    Q = np.empty(len(levels)) #List of ML estimates for each level
+    V = np.empty(len(levels)) #Variances of estimates on each level
+    C = np.empty(len(levels)) #Cost of estimates on each level
+    '''When using results from the warm-up it is important to note that for levels
+    where the next one is not the adjecant level, the value has not been calculated yet'''
+    '''Set values for warm start of multilevel scheme'''
+    Q[0] = Q_l[levels[0]]; V[0] = V_l[levels[0]]; C[0] = C_l[levels[0]] #Values for first level
+    '''Note that len(Q_l_l1)=L and len(Q_l)=L+1. So the first value in Q_l_l1 is Q_{1,0}.
+    Hence, if level 2 and 3 are included we want Q_{3,2}, which is at Q_l_l1[2]
+    '''
+    Q[1:] = Q_l_l1[levels[1:]-1]; V[0] = V_l_l1[levels[1:]-1]; C[0] = C_l_l1[levels[1:]-1] #Values for other levels
