@@ -15,7 +15,7 @@ def __put_copy(self,arr,index,new):
 
 #The KDMC method with the use of a step function
 @njit
-def KDMC(dt,x0,v0,e,tau,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],Nested =False):
+def KDMC(dt,x0,v0,e,tau,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],Nested =False,dR=None):
     '''
     dt: step size
     x0: initial positions
@@ -43,7 +43,7 @@ def KDMC(dt,x0,v0,e,tau,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable
         if n==0:
             break
         xi = np.random.normal(0,1,size=len(index))
-        x_temp,v_temp,t_temp,_ = phi_KD(dt,x[index],v[index],t[index],tau[index],xi,mu,sigma,M,R)
+        x_temp,v_temp,t_temp,_ = phi_KD(dt,x[index],v[index],t[index],tau[index],xi,mu,sigma,M,R,dR=dR)
         #Update first collision time for next step
         e = np.random.exponential(1,size=len(index))
         tau[index] = SC(x[index],v[index],e)
