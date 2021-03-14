@@ -2,7 +2,7 @@ from kinetic_diffusion.one_step import phi_KD,__psi_k
 from kinetic_diffusion.mc import KDMC
 from kinetic_diffusion.correlated import correlated as KD_C
 from kinetic_diffusion.correlated import set_last_nonzero_col
-from kinetic_diffusion.ml import warm_up
+from kinetic_diffusion.ml import warm_up,select_levels
 from AddPaths import Sfunc,delta,x_hat
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -300,6 +300,31 @@ def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
     return ss
 
 
+def test_warm_up(N=100,L=21):
+    L = 21; t0 = 0; T = 1
+    Q_l,Q_l_L,V_l,V_l_L,C_l,C_l_L = warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N=N)
+    plt.plot(1/2**np.arange(1,L+1),C_l_L/N)
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.show()
+
+
+def test_level_selection():
+    print('Here')
+    data = np.loadtxt(f'var_a_{a}_b_{b}_type_{type}.txt')
+    V = data[0]
+    V_d = data[1]
+    print(len(V_d))
+    L = select_levels(V,V_d[:-1])
+    dt_list = 1/2**np.arange(1,len(V_d),1)
+    plt.plot(dt_list,V_d[:-1],':')
+    plt.plot(dt_list[L],V_d[L],':')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.show()
+
+
+'''Exists in separate file as well'''
 def plot_var(V,V_d):
     dt_list = 1/2**np.arange(0,22,1)
     plt.plot(dt_list[:-1],V_d,':', label = f'a={a}')
@@ -310,6 +335,7 @@ def plot_var(V,V_d):
     plt.legend()
     plt.show()
 
+'''Probably redundant:'''
 def update_a(b):
     global a
     a = a + b
@@ -363,13 +389,10 @@ if __name__ == '__main__':
         np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
         # print(f'V: {V}')
         # plot_var(V,V_d)
-    elif test == 'warm_up' and type == 'B1' or type == 'B2':
-        L = 21; t0 = 0; T = 1
-        Q_l,Q_l_L,V_l,V_l_L,C_l,C_l_L = warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR)
-        plt.plot(1/2**np.arange(1,L+1),C_l_L/100)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.show()
+    elif test == 'warm_up' and (type == 'B1' or type == 'B2'):
+        test_warm_up()
+    elif test == 'select_levels' and (type == 'B1' or type == 'B2'):
+        test_level_selection()
 
 
 
