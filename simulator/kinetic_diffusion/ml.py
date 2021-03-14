@@ -2,9 +2,9 @@ import numpy as np
 from .correlated import correlated
 from .mc import KDMC
 import time
-from numba import njit,jit_module,prange
+from numba import njit,jit_module,prange,objmode
 
-# @njit(nogil=True,parallel=True)
+@njit(nogil=True,parallel=True)
 def warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
     dt_list = 1/2**np.arange(0,L+1)
     Q_l = np.zeros(L+1) #Estimates for all possible first levels
@@ -18,15 +18,21 @@ def warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
     tau = SC(x0,v0,e)
     for l in prange(L+1):
         if l < L:
-            start = time.time()
+            with objmode(start1='f8'):
+                start1 = time.perf_counter()
             x_f,x_c = correlated(dt_list[l+1],dt_list[l],x0,v0,v_l1_next,t0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR)
-            C_l_L[l] = time.time()-start
+            with objmode(end1='f8'):
+                end1 = time.perf_counter()
+            C_l_L[l] = end1-start1
             x_dif = x_f-x_c
             Q_l_L[l] = np.mean(x_dif)
             V_l_L[l] = np.var(x_dif)
-        start = time.time()
+        with objmode(start2='f8'):
+            start2 = time.perf_counter()
         x = KDMC(dt_list[l],x0,v0,e,tau,0,T,mu,sigma,M,R,SC)
-        C_l[l] = time.time()-start
+        with objmode(end2='f8'):
+            end2 = time.perf_counter()
+        C_l[l] = end2-start2
         Q_l[l] = np.mean(x)
         V_l[l] = np.var(x)
     return Q_l,Q_l_L,V_l,V_l_L,C_l,C_l_L

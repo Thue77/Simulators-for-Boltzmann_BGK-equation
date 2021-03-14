@@ -364,9 +364,9 @@ if __name__ == '__main__':
         # print(f'V: {V}')
         # plot_var(V,V_d)
     elif test == 'warm_up' and type == 'B1' or type == 'B2':
-        L = 15; t0 = 0; T = 1
+        L = 21; t0 = 0; T = 1
         Q_l,Q_l_L,V_l,V_l_L,C_l,C_l_L = warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR)
-        plt.plot(1/2**np.arange(1,L+1),V_l_L)
+        plt.plot(1/2**np.arange(1,L+1),C_l_L/100)
         plt.xscale('log')
         plt.yscale('log')
         plt.show()
