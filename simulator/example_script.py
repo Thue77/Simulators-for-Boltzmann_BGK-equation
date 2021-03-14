@@ -3,6 +3,7 @@ from kinetic_diffusion.mc import KDMC
 from kinetic_diffusion.correlated import correlated as KD_C
 from kinetic_diffusion.correlated import set_last_nonzero_col
 from kinetic_diffusion.ml import warm_up,select_levels
+from kinetic_diffusion.ml import ml as KDML
 from AddPaths import Sfunc,delta,x_hat
 import seaborn as sns
 import matplotlib.pyplot as plt

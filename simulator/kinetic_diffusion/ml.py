@@ -2,7 +2,7 @@ import numpy as np
 from .correlated import correlated
 from .mc import KDMC
 import time
-import AddPaths as AP
+import ..AddPaths as AP
 from numba import njit,jit_module,prange,objmode
 
 @njit(nogil=True,parallel=True)
@@ -93,9 +93,9 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None,L=14,N_warm 
     N_diff = np.ones(np.size(L_set),dtype=np.int64)*N_warm - N
     '''While loop to continue until RMSE fits with e2'''
     while True:
-        I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
         '''Update paths based on N_diff'''
-        while np.size(I):
+        while np.max(N_diff)>0:
+            I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             for i in I:
                 dt_f = (T-t0)/2**levels[i]
                 x0,v0,v_l1_next = Q(N_diff[i])
@@ -120,3 +120,18 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None,L=14,N_warm 
                     C_temp = (end2-start2)/N_diff[i]
                     E_temp = np.mean(x)
                     SS_temp = np.sum((x-E_temp)**2)
+                Delta = AP-delta(E[i],E_temp,N[i],N_diff[i])
+                E[i] = AP.x_hat(N[i],N_diff[i],E[i],E_temp,Delta)
+                SS[i] = AP.Sfunc(N[i],N_diff[i],SS[i],SS_temp,Delta)
+                N[i] = N[i] + N_diff[i]
+            V = SS/(N-1) #Update variance
+            '''Determine number of paths needed with new informtion'''
+            N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))) - N
+        '''Test bias is below e2/2'''
+        test = max(abs(0.5*E[L-1]),abs(E[L])) < e2/np.sqrt(2)
+        if test:
+            break
+        L += 1
+        N_diff = np.append(N_diff,100)
+        levels = np.append(levels,L)
+    return E,V,C,N,levels
