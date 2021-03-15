@@ -1,5 +1,5 @@
 from kinetic_diffusion.one_step import phi_KD,__psi_k
-from kinetic_diffusion.mc import KDMC
+from kinetic_diffusion.mc import KDMC,Kinetic
 from kinetic_diffusion.correlated import correlated as KD_C
 from kinetic_diffusion.correlated import set_last_nonzero_col
 from kinetic_diffusion.ml import warm_up,select_levels
@@ -45,7 +45,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v_norm = np.append(np.random.normal(0,1,size = len(index)),np.random.normal(0,1,size = N-len(index)))
         v[index] = (v_norm[0:len(index)] + 10)
         v[index_not] = (v_norm[len(index):]-10)
-    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         x = np.ones(N)
         v_norm = np.random.normal(0,1,size=N)
         v = mu(x) + sigma(x)*v_norm
@@ -151,14 +151,14 @@ def integral_to_boundary(x,bins,direction,slopes,intercepts):
 def mu(x):
     if test == 'figure 4':
         return 0
-    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 0
 
 
 def sigma(x):
     if test == 'figure 4':
         return 1/epsilon
-    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 1
 
 
@@ -323,6 +323,22 @@ def test_level_selection():
     print(f'levels: {levels}')
 
 
+def KDML_test():
+    E,V,C,N,levels = KDML(1e-5,Q,0,1,mu,sigma,M,R,SC,R_anti,dR,tau=None,L=14,N_warm = 100)
+    print(f'Multilevel result: {np.sum(E)}')
+    print(N)
+    print(f'variance: {np.sum(V/N)}')
+    plt.plot(1/2**levels,V)
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.show()
+
+def Kinetic_test():
+    N=N_global
+    x = Kinetic(N,Q,0,1,mu,sigma,M,R,SC)
+    print(f'Kinetic result: {np.mean(x)}')
+
+
 '''Exists in separate file as well'''
 def plot_var(V,V_d):
     dt_list = 1/2**np.arange(0,22,1)
@@ -392,7 +408,9 @@ if __name__ == '__main__':
         test_warm_up()
     elif test == 'select_levels' and (type == 'B1' or type == 'B2'):
         test_level_selection()
-
+    elif test == 'KDML' and (type == 'B1' or type == 'B2'):
+        KDML_test()
+        Kinetic_test()
 
 
     # print(test_numba(np.array([1,-2,3,4,-5],dtype=np.float64)))

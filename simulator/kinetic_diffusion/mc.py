@@ -1,5 +1,5 @@
 import numpy as np
-from .one_step import phi_KD
+from .one_step import phi_KD,__psi_k
 from typing import Callable,Tuple
 from numba import njit
 
@@ -7,14 +7,14 @@ from numba import njit
 
 
 #Function to return a copy of the given numpy array that has been given values 'new' at 'index'
-@njit
+@njit(nogil=True)
 def __put_copy(self,arr,index,new):
     out = arr.copy()
     out[index] = new
     return out
 
 #The KDMC method with the use of a step function
-@njit
+@njit(nogil=True)
 def KDMC(dt,x0,v0,e,tau,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],Nested =False,dR=None):
     '''
     dt: step size
@@ -56,4 +56,22 @@ def KDMC(dt,x0,v0,e,tau,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable
         index = np.argwhere(I).flatten()
         x[index] = x[index] + v[index]*(T-t[index])
         t[index] = T
+    return x
+
+# @njit(nogil=True)
+def Kinetic(N,Q,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray]):
+    x,v,_ = Q(N)
+    t = t0*np.ones(N)
+    I = np.ones(N).astype(np.bool);tau = np.ones(N)*T
+    while True:
+        e = np.random.exponential(1,size=np.sum(I))
+        tau[I] = SC(x[I],v[I],e)
+        I = (t+tau)<=T #Indicate active paths
+        if np.sum(I)==0:
+            break
+        x[I],t[I] = __psi_k(tau[I],x[I],v[I],t[I])
+        v[I] = mu(x[I])+sigma(x[I])*M(x[I])
+    I = (T-t)>0
+    if np.sum(I)>0:
+        x[I] = x[I] + v[I]*(T-t[I])
     return x

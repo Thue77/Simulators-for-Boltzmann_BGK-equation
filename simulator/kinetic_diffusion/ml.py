@@ -2,7 +2,7 @@ import numpy as np
 from .correlated import correlated
 from .mc import KDMC
 import time
-import ..AddPaths as AP
+from .AddPaths import delta,x_hat,Sfunc
 from numba import njit,jit_module,prange,objmode
 
 @njit(nogil=True,parallel=True)
@@ -61,9 +61,9 @@ def select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
             V_min = V_d[j]
     L_set = np.array(levels)
     '''Set up output variables based on level selection and set values of non adjecant levels to zero'''
-    Q_out = np.empty(np.size(L_set)) #List of ML estimates for each level
-    V_out = np.empty(np.size(L_set)) #Variances of estimates on each level
-    C_out = np.empty(np.size(L_set)) #Cost of estimates on each level
+    Q_out = np.empty(len(L_set)) #List of ML estimates for each level
+    V_out = np.empty(len(L_set)) #Variances of estimates on each level
+    C_out = np.empty(len(L_set)) #Cost of estimates on each level
     Q_out[0] = Q_est[levels[0]]; V_out[0] = V[levels[0]]; C_out[0] = C[levels[0]] #Values for first level
     '''Note that len(Q_l_l1)=L and len(Q_l)=L+1. So the first value in Q_l_l1 is Q_{1,0}.
     Hence, if level 2 and 3 are included we want Q_{3,2}, which is at Q_l_l1[2]
@@ -76,7 +76,7 @@ def select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
     '''Insert in output variables'''
     Q_out[1:] = Q_temp; V_out[1:] = V_temp; C_out[1:] = C_temp; #Values for other levels
     '''Set number of paths for each level'''
-    N_out = N*np.where(C_out > 0)[0]
+    N_out = N*np.ones(len(L_set),dtype=np.int64)*(C_out > 0)
     return L_set,N_out,Q_out,V_out,C_out
 
 @njit(nogil=True)
@@ -84,19 +84,25 @@ def diff_np(a):
     '''Replacement for np.diff'''
     return a[1:]-a[:-1]
 
-def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None,L=14,N_warm = 100):
+# @njit(nogil=True)
+def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100):
     '''First do warm-up and select levels with L being the maximum level'''
     levels,N,E,V,C = select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N_warm,tau)
     '''Variances will be updated and saved as sum of squares'''
     SS = (N-1)*V
+    '''Number of levels to use'''
+    L_num = len(levels)
     '''Paths still needed to minimize total cost based on current information on variance and cost for each level'''
-    N_diff = np.ones(np.size(L_set),dtype=np.int64)*N_warm - N
+    N_diff = np.ones(L_num,dtype=np.int64)*N_warm - N
+    # print(f'N_diff: {N_diff}')
     '''While loop to continue until RMSE fits with e2'''
     while True:
         '''Update paths based on N_diff'''
         while np.max(N_diff)>0:
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
+            # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
             for i in I:
+                # print(i)
                 dt_f = (T-t0)/2**levels[i]
                 x0,v0,v_l1_next = Q(N_diff[i])
                 if i!=0:
@@ -110,28 +116,33 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None,L=14,N_warm 
                     E_temp = np.mean(x_f-x_c)
                     SS_temp = np.sum((x_f-x_c-E_temp)**2)
                 else:
-                    e = np.random.exponential(scale=1,size=N) #Could maybe be implemented in KDMC
+                    e = np.random.exponential(scale=1,size=N_diff[i]) #Could maybe be implemented in KDMC
                     tau = SC(x0,v0,e) #Could maybe be implemented in KDMC
                     with objmode(start2 = 'f8'):
                         start2 = time.perf_counter()
-                    x = KDMC(dt,x0,v0,e,tau,t0,T,mu,sigma,M,R,SC,dR=dR)
+                    x = KDMC(dt_f,x0,v0,e,tau,t0,T,mu,sigma,M,R,SC,dR=dR)
                     with objmode(end2 = 'f8'):
                         end2 = time.perf_counter()
                     C_temp = (end2-start2)/N_diff[i]
                     E_temp = np.mean(x)
                     SS_temp = np.sum((x-E_temp)**2)
-                Delta = AP-delta(E[i],E_temp,N[i],N_diff[i])
-                E[i] = AP.x_hat(N[i],N_diff[i],E[i],E_temp,Delta)
-                SS[i] = AP.Sfunc(N[i],N_diff[i],SS[i],SS_temp,Delta)
+                Delta = delta(E[i],E_temp,N[i],N_diff[i])
+                E[i] = x_hat(N[i],N_diff[i],E[i],E_temp,Delta)
+                SS[i] = Sfunc(N[i],N_diff[i],SS[i],SS_temp,Delta)
+                '''Update cost like updating an average'''
+                C[i] = x_hat(N[i],N_diff[i],C[i],C_temp,delta(C[i],C_temp,N[i],N_diff[i]))
                 N[i] = N[i] + N_diff[i]
             V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new informtion'''
-            N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))) - N
+            N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
         '''Test bias is below e2/2'''
-        test = max(abs(0.5*E[L-1]),abs(E[L])) < e2/np.sqrt(2)
+        test = max(abs(0.5*E[L_num-2]),abs(E[L_num-1])) < np.sqrt(e2/2)
         if test:
             break
-        L += 1
-        N_diff = np.append(N_diff,100)
+        L += 1; L_num += 1;
+        print(f'New level: {L}')
+        N_diff = np.append(N_diff,100).astype(np.int64)
+        N = np.append(N,0).astype(np.int64)
+        E = np.append(E,0.0); V = np.append(V,0.0); C = np.append(C,0.0)
         levels = np.append(levels,L)
     return E,V,C,N,levels
