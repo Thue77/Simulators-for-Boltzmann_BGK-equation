@@ -6,6 +6,47 @@ from .AddPaths import delta,x_hat,Sfunc
 from numba import njit,jit_module,prange,objmode
 import sys
 
+#Uses existing data - for plotting pruposes
+def select_levels_data(data):
+    '''
+    V: array of variances. Length L+1
+    V_d: array of variances of bias. Length L
+    output:
+    let l be in levels[1:]. Then dt^f = 1/2**l.
+    for l=levels[0], dt = 1/2**l
+    '''
+    V = data[0]
+    V_d = data[1][:-1]
+    l = 1
+    for i in range(len(V_d)):
+        if V_d[i]>V[i+1]:
+            l+=l
+        else:
+            break
+    levels = [l-1,l]
+    V_min = V_d[l-1]
+    for j in range(l,len(V_d)):
+        if V_d[j]<V_min/2:
+            levels += [j+1]
+            V_min = V_d[j]
+    L_set = np.array(levels)
+    '''Set up output variables based on level selection and set values of non adjecant levels to zero'''
+    V_out = np.empty(len(L_set)) #Variances of estimates on each level
+    V_out[0] = V[levels[0]] #Values for first level
+    '''Note that len(Q_l_l1)=L and len(Q_l)=L+1. So the first value in Q_l_l1 is Q_{1,0}.
+    Hence, if level 2 and 3 are included we want Q_{3,2}, which is at Q_l_l1[2]
+    '''
+    '''First determine jumps in levels'''
+    jumps = np.where(diff_np(L_set)>1)[0] #index for jumps in terms of correlated results
+    V_temp = V_d[L_set[1:]-1]
+    '''No results are available for non-adjecant levels. So they are set to 0'''
+    V_temp[jumps] = 0
+    '''Insert in output variables'''
+    V_out[1:] = V_temp #Values for other levels
+    '''Set number of paths for each level'''
+    return L_set,V_out
+
+
 @njit(nogil=True,parallel=True)
 def warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
     dt_list = 1/2**np.arange(0,L+1)
@@ -60,7 +101,7 @@ def select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
     # if np.sum(test)>1:
         # l = np.argwhere(test).flatten()[-1]+2 #Last index where variance of bias is larger than V
     levels = [l-1,l]
-    V_min = V_d[max(l-2,0)]
+    V_min = V_d[l-1]
     for j in range(l,len(V_d)):
         if V_d[j]<V_min/2:
             levels += [j+1]

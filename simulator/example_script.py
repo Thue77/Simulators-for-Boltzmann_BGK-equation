@@ -2,7 +2,7 @@ from kinetic_diffusion.one_step import phi_KD,__psi_k
 from kinetic_diffusion.mc import KDMC,Kinetic
 from kinetic_diffusion.correlated import correlated as KD_C
 from kinetic_diffusion.correlated import set_last_nonzero_col
-from kinetic_diffusion.ml import warm_up,select_levels
+from kinetic_diffusion.ml import warm_up,select_levels,select_levels_data
 from kinetic_diffusion.ml import ml as KDML
 from AddPaths import Sfunc,delta,x_hat
 import seaborn as sns
@@ -310,15 +310,22 @@ def test_warm_up(N=100,L=21):
     plt.show()
 
 
-def test_level_selection():
-    # data = np.loadtxt(f'var_a_{a}_b_{b}_type_{type}.txt')
-    L = 21; t0 = 0; T = 1
-    levels,N,X,V,C = select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N=100,tau=None)
-    dt_list = 1/2**np.arange(1,L+1)
-    # plt.plot(dt_list,V_d[:-1],':')
-    plt.plot(dt_list[levels],V,':')
+def test_level_selection(plot=True):
+    if plot:
+        data = np.loadtxt(f'var_a_{a}_b_{b}_type_{type}.txt')
+        V_before = data[0]
+        V_d = data[1][:-1]
+        dt_list = 1/2**np.arange(0,22)
+        plt.plot(dt_list[1:],V_d,label='All levels')
+        levels,V = select_levels_data(data)
+    else:
+        L = 21; t0 = 0; T = 1
+        dt_list = 1/2**np.arange(1,L+1)
+        levels,N,X,V,C = select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N=100,tau=None)
+    plt.plot(dt_list[levels],V,'.',color='black',label='Selected levels')
     plt.xscale('log')
     plt.yscale('log')
+    plt.legend()
     plt.show()
     print(f'levels: {levels}')
 
