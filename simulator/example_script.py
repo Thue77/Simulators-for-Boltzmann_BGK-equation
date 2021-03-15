@@ -283,7 +283,7 @@ def compute_mean_alongaxis(A,axis=0):
 
 @njit(nogil=True,parallel=True)
 def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
-    '''If axis is zero then the mean of each coulmn is calculated
+    '''If axis is zero then the sum of squares of each coulmn is calculated
     A: matrix of sum of squares for each run
     A_mean: matrix of means for each run
     N: number of paths used in each run
@@ -324,9 +324,11 @@ def test_level_selection():
 
 
 def KDML_test():
-    E,V,C,N,levels = KDML(1e-5,Q,0,1,mu,sigma,M,R,SC,R_anti,dR,tau=None,L=14,N_warm = 100)
+    E,V,C,N,levels = KDML(1e-3,Q,0,1,mu,sigma,M,R,SC,R_anti,dR,tau=None,L=22,N_warm = 10)
     print(f'Multilevel result: {np.sum(E)}')
     print(N)
+    print(f'levels: {levels}')
+    print(f'variance at each level: {V}')
     print(f'variance: {np.sum(V/N)}')
     plt.plot(1/2**levels,V)
     plt.xscale('log')
@@ -410,7 +412,7 @@ if __name__ == '__main__':
         test_level_selection()
     elif test == 'KDML' and (type == 'B1' or type == 'B2'):
         KDML_test()
-        Kinetic_test()
+        # Kinetic_test()
 
 
     # print(test_numba(np.array([1,-2,3,4,-5],dtype=np.float64)))

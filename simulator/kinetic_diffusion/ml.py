@@ -4,6 +4,7 @@ from .mc import KDMC
 import time
 from .AddPaths import delta,x_hat,Sfunc
 from numba import njit,jit_module,prange,objmode
+import sys
 
 @njit(nogil=True,parallel=True)
 def warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
@@ -50,16 +51,23 @@ def select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
     '''
     Q_est,Q_d,V,V_d,C,C_d = warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N)
     l = 1
-    test = V_d > V[1:]
-    if np.sum(test)>1:
-        l = np.argwhere(test).flatten()[-1]+2 #Last index where variance of bias is larger than V
+    for i in range(len(V_d)):
+        if V_d[i]>V[i+1]:
+            l+=l
+        else:
+            break
+    # test = V_d > V[1:]
+    # if np.sum(test)>1:
+        # l = np.argwhere(test).flatten()[-1]+2 #Last index where variance of bias is larger than V
     levels = [l-1,l]
     V_min = V_d[max(l-2,0)]
     for j in range(l,len(V_d)):
         if V_d[j]<V_min/2:
-            levels += [j]
+            levels += [j+1]
             V_min = V_d[j]
     L_set = np.array(levels)
+    # print(f'Last level: {len(V)-1}, levels: {L_set}')
+    # sys.exit()
     '''Set up output variables based on level selection and set values of non adjecant levels to zero'''
     Q_out = np.empty(len(L_set)) #List of ML estimates for each level
     V_out = np.empty(len(L_set)) #Variances of estimates on each level
@@ -84,7 +92,7 @@ def diff_np(a):
     '''Replacement for np.diff'''
     return a[1:]-a[:-1]
 
-# @njit(nogil=True)
+@njit(nogil=True)
 def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100):
     '''First do warm-up and select levels with L being the maximum level'''
     levels,N,E,V,C = select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N_warm,tau)
@@ -140,7 +148,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100)
         if test:
             break
         L += 1; L_num += 1;
-        print(f'New level: {L}')
+        # print(f'New level: {L}')
         N_diff = np.append(N_diff,100).astype(np.int64)
         N = np.append(N,0).astype(np.int64)
         E = np.append(E,0.0); V = np.append(V,0.0); C = np.append(C,0.0)
