@@ -4,6 +4,7 @@ from kinetic_diffusion.correlated import correlated as KD_C
 from kinetic_diffusion.correlated import set_last_nonzero_col
 from kinetic_diffusion.ml import warm_up,select_levels,select_levels_data
 from kinetic_diffusion.ml import ml as KDML
+from splitting.mc import mc as APSMC
 from AddPaths import Sfunc,delta,x_hat
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -45,7 +46,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v_norm = np.append(np.random.normal(0,1,size = len(index)),np.random.normal(0,1,size = N-len(index)))
         v[index] = (v_norm[0:len(index)] + 10)
         v[index_not] = (v_norm[len(index):]-10)
-    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML' or 'APS':
         x = np.ones(N)
         v_norm = np.random.normal(0,1,size=N)
         v = mu(x) + sigma(x)*v_norm
@@ -149,21 +150,18 @@ def integral_to_boundary(x,bins,direction,slopes,intercepts):
 
 
 def mu(x):
-    if test == 'figure 4':
+    if test == 'figure 4' or test=='APS':
         return 0
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 0
 
 
 def sigma(x):
-    if test == 'figure 4':
+    if test == 'figure 4' or test=='APS':
         return 1/epsilon
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 1
 
-
-def test_numba(x):
-    return np.sign(x).astype(np.int64)
 
 
 jit_module(nopython=True,nogil=True)
@@ -346,6 +344,8 @@ def Kinetic_test():
     N=N_global
     x = Kinetic(N,Q,0,1,mu,sigma,M,R,SC)
     print(f'Kinetic result: {np.mean(x)}')
+
+def compare_APS_kinetic
 
 
 '''Exists in separate file as well'''
