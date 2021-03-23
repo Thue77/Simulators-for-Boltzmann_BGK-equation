@@ -288,9 +288,9 @@ def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
     '''
     n = A.shape[axis]
     m = A.shape[0] if axis==1 else A.shape[1]
-    ss = np.zeros(m)
+    ss = A[0,:]
     for j in prange(m):
-        mu_old = 0
+        mu_old = A_mean[0,j]
         for i in prange(n):
             Delta = A_mean[i,j] - mu_old
             M = (N*(N*(i)))/(N+N*(i))
@@ -345,7 +345,8 @@ def Kinetic_test():
     x = Kinetic(N,Q,0,1,mu,sigma,M,R,SC)
     print(f'Kinetic result: {np.mean(x)}')
 
-def compare_APS_kinetic
+def compare_APS_kinetic:
+    pass
 
 
 '''Exists in separate file as well'''

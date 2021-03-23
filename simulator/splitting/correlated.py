@@ -88,15 +88,46 @@ def correlated_rv(x,v,dt_f,eps,v_tilde,N,M_t,B):
 @njit(nogil = True,parallel=True)
 def test_var(dt_0,L,M_t,t,T,eps,N,Q,B):
     dt_list = dt_0/M_t**np.arange(0,L+1)
-    V_d = np.zeros(L); E_d = np.zeros(L);
-    V = np.zeros(L); E = np.ones(L);
-    for j in prange(10):
-        N_c = 10_000
+    runs = 10
+    N_c = 10_000
+    V = np.zeros((runs,len(dt_list)-1)); E = np.zeros((runs,len(dt_list)-1))
+    V_d = np.zeros((runs,len(dt_list)-1)); E_bias = np.zeros((runs,len(dt_list)-1))
+    for r in prange(runs):
         for i in range(1,L+1):
             x_f,x_c = correlated(dt_list[i],M_t,t,T,eps,N_c,Q,B)
-            V_d[i-1] = np.var(x_f**2-x_c**2); E_d[i-1] = np.mean(x_f**2-x_c**2)
-            V[i-1] = np.var(x_f**2); E[i-1] = np.mean(x_f**2)
-    return V,E,V_d,E_d
+            E_bias[r,i-1] = np.mean(x_f**2-x_c**2)
+            V_d[r,i-1] = np.sum((x_f**2-x_c**2-E_bias[r,i-1])**2);
+            E[r,i-1] = np.mean(x_f**2)
+            V[r,i-1] = np.sum((x_f**2-E[r,i-1])**2)
+            # V_d[i-1] = np.var(x_f**2-x_c**2); E_d[i-1] = abs(np.mean(x_f**2-x_c**2))
+            # V[i-1] = np.var(x_f**2); E[i-1] = np.mean(x_f**2)
+    E_bias = np.abs(E_bias)
+    V_out,E_out = add_sum_of_squares_alongaxis(V,E,N_c)
+    V_d_out,E_d_out = add_sum_of_squares_alongaxis(V_d,E_bias,N_c)
+    return V_out/(N-1),E_out,V_d_out/(N-1),E_d_out
+
+@njit(nogil=True,parallel=True)
+def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
+    '''If axis is zero then the sum of squares of each coulmn is calculated
+    A: matrix of sum of squares for each run
+    A_mean: matrix of means for each run
+    N: number of paths used in each run
+    '''
+    n = A.shape[axis]
+    m = A.shape[0] if axis==1 else A.shape[1]
+    ss = A[0,:]
+    E = np.zeros(m)
+    for j in prange(m):
+        mu_old = A_mean[0,j]
+        # print(mu_old)
+        for i in range(1,n):
+            Delta = A_mean[i,j] - mu_old
+            M = (N*(N*(i)))/(N+N*(i))
+            ss[j] = ss[j] + A[i,j] + Delta**2*M
+            mu_old = mu_old + Delta*(N*i)/(N+N*i)
+        E[j] = mu_old
+    return ss,E
+
 
 if __name__ == '__main__':
     model = 'Goldstein-Taylor'
@@ -118,9 +149,10 @@ if __name__ == '__main__':
     # dt_f=0.2;M_t=5;t=0;T=10;N=10_000;eps=0.5
     # x_f,x_c = correlated(dt_f,M_t,t,T,eps,N,lambda N: (np.zeros(N),1,np.ones(N)),B,plot_var=True)
     if True:
-        dt_0 = 2.5;M_t = 2;L=16
+        dt_0 = 2.5;M_t = 2;L=16;eps = 0.1
         dt_list = dt_0/M_t**np.arange(0,L+1)
-        V,E,V_d,E_d = test_var(dt_0,L,M_t,0,5,0.1,100_000,Q ,B)
+        V,E,V_d,E_d = test_var(dt_0,L,M_t,0,5,eps,100_000,Q ,B)
+        print(E_d)
         plt.figure(1)
         plt.subplot(122)
         plt.plot(dt_list[1:],V_d,label='Diff')
@@ -137,3 +169,8 @@ if __name__ == '__main__':
         plt.yscale('log')
         plt.legend()
         plt.show()
+
+    if False:
+        A = np.zeros((2,3))
+        A_mean = np.array([[2,4,6],[0,0,0]])
+        print(add_sum_of_squares_alongaxis(A,A_mean,N=1)[1])
