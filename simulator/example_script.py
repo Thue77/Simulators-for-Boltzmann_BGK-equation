@@ -5,6 +5,8 @@ from kinetic_diffusion.correlated import set_last_nonzero_col
 from kinetic_diffusion.ml import warm_up,select_levels,select_levels_data
 from kinetic_diffusion.ml import ml as KDML
 from splitting.mc import mc as APSMC
+from splitting.one_step import phi_SS
+from space import Omega
 from AddPaths import Sfunc,delta,x_hat
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -25,7 +27,7 @@ a = float(sys.argv[3])#5
 b=float(sys.argv[4])#100
 test = str(sys.argv[5])#'figure 5'
 N_global = int(sys.argv[6])
-print(f'a={a}, b={b},type={type}')
+print(f'a={a}, b={b},type={type}, test={test}')
 
 
 '''Methods giving the properties of the plasma'''
@@ -46,10 +48,21 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v_norm = np.append(np.random.normal(0,1,size = len(index)),np.random.normal(0,1,size = N-len(index)))
         v[index] = (v_norm[0:len(index)] + 10)
         v[index_not] = (v_norm[len(index):]-10)
-    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML' or 'APS':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML' or test=='APS':
         x = np.ones(N)
+        # print('Her')
         v_norm = np.random.normal(0,1,size=N)
         v = mu(x) + sigma(x)*v_norm
+    else:
+        x = np.zeros(N); v = np.zeros(N)
+        U = np.random.uniform(size = int(N/3))
+        x[:int(2*N/3)] = np.random.uniform(-0.5,0.5,size=int(2*N/3))
+        x[int(2*N/3):] = (U<=0.5)* np.random.uniform(-1.0,-0.5,size=int(N/3)) + (U>0.5)* np.random.uniform(0.5,1.0,size=int(N/3))
+        U = np.random.uniform(size = int(N/3))
+        v[:int(2*N/3)] = np.random.uniform(-0.75,0.25,size=int(2*N/3))
+        # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
+        v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
+        v_norm = v
     return x,v,v_norm
 
 #sets the collision rate
@@ -164,7 +177,7 @@ def sigma(x):
 
 
 
-jit_module(nopython=True,nogil=True)
+# jit_module(nopython=True,nogil=True)
 
 '''Tests'''
 
@@ -345,8 +358,8 @@ def Kinetic_test():
     x = Kinetic(N,Q,0,1,mu,sigma,M,R,SC)
     print(f'Kinetic result: {np.mean(x)}')
 
-def compare_APS_kinetic:
-    pass
+def compare_APS_kinetic():
+    return None
 
 
 '''Exists in separate file as well'''
@@ -421,6 +434,30 @@ if __name__ == '__main__':
     elif test == 'KDML' and (type == 'B1' or type == 'B2'):
         KDML_test()
         # Kinetic_test()
+    elif True:
+        x_lim = (-1,1); v_lim = (-1,1)
+        N_x,N_v = 20,10
+        N = 90_000
+        SP = Omega(x_lim,v_lim,N_x,N_v)
+        boundary = lambda x: (x<x_lim[0])*x_lim[1] +(x>=x_lim[1])*x_lim[0] + (x<=x_lim[1])*(x>=x_lim[0])*x
+        # print(boundary(np.array([-1.2,0.9,0.3,1.4])))
+        # sys.exit()
+        B = lambda x: np.random.uniform(v_lim[0],v_lim[1],size=len(x))
+        x,v,_ = Q(N)
+        # print(v)
+        # t = 0; dt = 0.005
+        # while t<2.5:
+        #     x,v = phi_SS(x,v,dt,5e-2)
+        #     x = boundary(x)
+        #     t += dt
+        x = APSMC(0.005,0,2.5,90_000,5e-2,Q,B,boundary=boundary)
+        # print(x)
+        # rho = SP.density_estimation(x)
+        dist = pd.DataFrame(data={'x':x})
+        sns.kdeplot(data=dist, x="x")
+        # plt.plot(SP.x_axis,rho)
+        plt.show()
+
 
 
     # print(test_numba(np.array([1,-2,3,4,-5],dtype=np.float64)))

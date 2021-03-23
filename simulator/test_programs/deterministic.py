@@ -4,12 +4,12 @@ from numpy.linalg import inv
 '''Solve kinetic equation deterministically using central difference'''
 eps = 1
 #Step sizes
-h_x = 1#input('step size for x: ')
+h_x = 0.1#input('step size for x: ')
 h_v = 1#input('step size for v: ')
 
 #Domain
-start = (-10,-10) #coordinate of lower left corner in descrete domain
-end = (10,10)
+start = (-1,-1) #coordinate of lower left corner in descrete domain
+end = (1,1)
 
 #Axis
 x_axis = np.arange(start[0],end[0]+h_x,h_x)

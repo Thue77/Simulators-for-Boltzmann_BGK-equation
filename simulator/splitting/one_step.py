@@ -8,7 +8,7 @@ def psi_t(x,v,dt,eps,z,r=1):
     # print(dt)
     # D = (v*eps/(eps**2+dt*r))**2*dt/(eps**2+dt*r)
     # return x + v*eps/(eps**2+dt*r)*dt +   np.sqrt(2*dt)*np.sqrt(D)*z#np.sqrt(2*(v*eps/(eps**2+dt*r))**2*dt**2/(eps**2+dt*r))*z
-    D = dt/(eps**2+dt*r)*v**2
+    D = dt/(eps**2+dt*r)#*v**2
     return x + v*dt + np.sqrt(2*dt*D)*z
 
 def psi_c(x,v,dt,eps,u,B,v_tilde,r=1,v_bar = None):
@@ -33,4 +33,10 @@ def phi_APS(x,v,dt,eps,z,u,B,v_tilde=1,r=1,v_next=None):
     x = psi_t(x,v,dt,eps,z,r)
     v,v_bar = psi_c(x,v,dt,eps,u,B,v_tilde,r,v_next)
     return x,v,v_bar
-jit_module(nopython=True,nogil=True)
+# jit_module(nopython=True,nogil=True)
+
+def phi_SS(x,v,dt,eps):
+    x = v/eps*dt
+    u = np.random.uniform(size=len(x))
+    v = np.random.uniform(-1,1,size=len(x))*(u<=dt/eps**2) + v*(u>dt/eps**2)
+    return x,v
