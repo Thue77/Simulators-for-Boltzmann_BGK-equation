@@ -15,7 +15,7 @@ end = (1,1)
 x_axis = np.arange(start[0],end[0]+h_x,h_x)
 v_axis = np.arange(start[1],end[1]+h_v,h_v)
 
-#Number of increments
+#Number of increments 
 N_x = int((end[0]-start[0])/h_x)
 N_v = int((end[1]-start[1])/h_v)
 
