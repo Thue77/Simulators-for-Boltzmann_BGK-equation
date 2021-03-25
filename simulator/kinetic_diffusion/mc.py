@@ -15,7 +15,9 @@ def __put_copy(self,arr,index,new):
 
 #The KDMC method with the use of a step function
 @njit(nogil=True)
-def KDMC(dt,x0,v0,e,tau,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],Nested =False,dR=None):
+def KDMC(dt,x0,v0,e,tau,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],
+M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],
+Nested =False,dR=None,boundary=None):
     '''
     dt: step size
     x0: initial positions
@@ -31,7 +33,7 @@ def KDMC(dt,x0,v0,e,tau,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable
     SC: method for obtaining the next collision times
     '''
     n = x0.size
-    r = x0.size
+    # r = x0.size
     n_old = n
     t = np.ones(n)*t0
     I = (t+tau)<T
@@ -70,7 +72,7 @@ def Kinetic(N,Q,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.nda
         if np.sum(I)==0:
             break
         x[I],t[I] = __psi_k(tau[I],x[I],v[I],t[I])
-        v[I] = mu(x[I])+sigma(x[I])*M(x[I])
+        v[I],_ = M(x[I])
     I = (T-t)>0
     if np.sum(I)>0:
         x[I] = x[I] + v[I]*(T-t[I])
