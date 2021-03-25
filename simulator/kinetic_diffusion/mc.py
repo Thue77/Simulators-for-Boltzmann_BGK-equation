@@ -14,7 +14,7 @@ def __put_copy(self,arr,index,new):
     return out
 
 #The KDMC method with the use of a step function
-@njit(nogil=True)
+# @njit(nogil=True)
 def KDMC(dt,x0,v0,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],
 M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],
 Nested =False,dR=None,boundary=None):

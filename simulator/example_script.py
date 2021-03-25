@@ -61,7 +61,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # v[:int(2*N/3)] = np.random.uniform(-0.75,0.25,size=int(2*N/3))
         # # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
         # v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
-        v_norm = v.copy()
+        v_norm = v/sigma(x)
     return x,v,v_norm
 
 #sets the collision rate
@@ -178,11 +178,10 @@ def sigma(x):
     elif test == 'num_exp_homo':
         return np.sqrt(1/3)/epsilon
 
-
 def M(x):
     if test == 'num_exp_homo':
-        v_norm = np.random.uniform(-1,1,size=len(x))#/epsilon
-        v_next = v_norm/epsilon
+        v_next = np.random.uniform(-1,1,size=len(x))/epsilon
+        v_norm = v_next/sigma(x)
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = mu(x) + sigma(x)*v_norm
@@ -196,6 +195,17 @@ def boundary_periodic(x):
     x[I_low] = x[I_low] + l#xL-((x0-x[I_low])%l)
     x[I_high] = x[I_high] - l#x0 + ((x[I_high]-xL)%l)
     return x
+
+
+'''Methods only for splitting methods'''
+
+'''Distribution for splitting methods. Divided into standardized and non-standardized
+versions'''
+
+def B(x,v_char):
+    v_norm = np.random.uniform(-1,1,size=len(x))/np.sqrt(1/3)
+    return v_norm,v_norm
+
 
 
 jit_module(nopython=True,nogil=True)
@@ -457,35 +467,22 @@ if __name__ == '__main__':
         # Kinetic_test()
     elif test == 'num_exp_homo' and type=='default':
         x_lim = (0,1); v_lim = (-1,1)
-        # N_x,N_v = 20,10
-        # SP = Omega(x_lim,v_lim,N_x,N_v)
         N = 400_000
-        # boundary = lambda x: (x<x_lim[0])*x_lim[1] +(x>=x_lim[1])*x_lim[0] + (x<=x_lim[1])*(x>=x_lim[0])*x
-        # print(boundary(np.array([-1.2,0.9,0.3,1.4])))
-        # sys.exit()
-        # B = lambda x: np.random.uniform(v_lim[0],v_lim[1],size=len(x))
-        # x,v,_ = Q(N)
-        # print(v)
-        # t = 0; dt = 0.005
-        # while t<2.5:
-        #     x,v = phi_SS(x,v,dt,5e-2)
-        #     x = boundary(x)
-        #     t += dt
         dt = 0.005;t0=0;T=0.1
-        if False:
-            x = APSMC(dt,t0,T,N,epsilon,Q,M,boundary=boundary_periodic)
-        elif True:
+        if True:
+            x = APSMC(dt,t0,T,N,epsilon,Q,M,boundary=boundary_periodic,sigma=sigma)
+        elif False:
             x0,v0,_ = Q(N)
             # e = np.random.exponential(size=N); tau = SC(x0,v0,e)
             x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
         elif False:
             t = t0
-            dt = min(epsilon**2/2,dt)
+            # dt = min(epsilon**2/2,dt)
             print(dt)
-            x,v,_ = Q(N)
-            v = v*epsilon
-            dist = pd.DataFrame(data={'x':x})
-            sns.kdeplot(data=dist, x="x",cut=0,label='Initial')
+            x,_,_ = Q(N)
+            v = epsilon/(epsilon**2+dt)*np.random.uniform(-1,1,size=len(x))
+            # dist = pd.DataFrame(data={'x':x})
+            # sns.kdeplot(data=dist, x="x",cut=0,label='Initial')
             while t<T:
                 x,v = phi_SS(x,v,dt,epsilon)
                 x = boundary_periodic(x)
