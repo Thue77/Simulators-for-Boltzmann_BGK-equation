@@ -1,92 +1,188 @@
 import numpy as np
 from scipy.stats import norm
 from numpy.linalg import inv
+import matplotlib.pyplot as plt
+from accept_reject import test1
+import seaborn as sns
+import pandas as pd
+from numba import njit
+import sys
 '''Solve kinetic equation deterministically using central difference'''
-eps = 1
+eps = 0.01#0.05
 #Step sizes
-h_x = 0.1#input('step size for x: ')
-h_v = 1#input('step size for v: ')
+dx = 0.1#input('step size for x: ')
+p = 10#input('step size for v: ')
+dv = 1/p
+I_t = (0,2.5)
+dt = 0.01
 
 #Domain
-start = (-1,-1) #coordinate of lower left corner in descrete domain
+start = (0,-1) #coordinate of lower left corner in descrete domain
 end = (1,1)
 
 #Axis
-x_axis = np.arange(start[0],end[0]+h_x,h_x)
-v_axis = np.arange(start[1],end[1]+h_v,h_v)
-
-#Number of increments 
-N_x = int((end[0]-start[0])/h_x)
-N_v = int((end[1]-start[1])/h_v)
-
-#Initial value - Try to initialise particles to by uniform in [-1,1] and let velocities be standard normal
-'''At each x in [-5,5] generate standard normal numbers and count the th fraction
-of numbers in each [v_i-h_v,v_i+h_v], and use that as an approximation at v_i'''
-f = np.zeros((N_x+1)*(N_v+1)) #Vector f_hat
-#initilise at time 0
-for i in range(1,N_x):
-    N = 10_000
-    V = np.append(np.random.normal(loc=-1,size = int(N/2)),np.random.normal(loc=1,size = int(N/2)))
-    v = start[1] + h_v
-    for j in range(1,N_v):
-        f[i+(N_v+1)*j] = (np.sum(np.logical_and(V<v+0.5*h_v,V>v-0.5*h_v))/N)/(N_x-1)
-        v = v+h_v
-'''Set up advection matrix. Needs to be a block diagonal matrix with the block diagonal defined as below'''
-A = np.zeros(((N_x+1),(N_v+1)))
-for i in range(1,N_x):
-    A[i,i-1] = 1
-    # A[i,i] = -2
-    A[i,i+1] = 1
-A = 1/h_x**2*A
-
-'''Set up v'''
-v = np.zeros((N_x+1)*(N_v+1))
-for j in range(N_v+1):
-    v[(N_x+1)*j:(N_x+1)*(j+1)] = start[1]+j*h_v
-
-'''Convert f to matrix'''
-def to_matrix(f,N_x,N_v):
-    F = np.zeros((N_x+1,N_v+1))
-    for i in range(N_x+1):
-        F[i,:] = f[i*(N_x+1):(i+1)*(N_x+1)]
-    return F
-
-'''Block-diagonl multiplication'''
-def block_multiply(A,f):
-    out = np.zeros(len(f))
-    for j in range(N_v+1):
-        out[j*(N_x+1):(j+1)*(N_x+1)] = np.matmul(A,f[j*(N_x+1):(j+1)*(N_x+1)])
-    return out
-
-'''Calculate discrete densiyt values for M'''
-def M(N=10_000):
-    V = np.random.normal(size = int(N))
-    out = np.zeros(N_v+1)
-    for j in range(N_v+1):
-        v_j = start[1]+j*h_v
-        out[j] = np.sum(np.logical_and(V<v_j+0.5*h_v,V>v_j-0.5*h_v))/N
-    return out
+x_axis = np.arange(start[0],end[0],dx)
+v_axis =  np.append(-(2*np.flip(np.arange(1,p+1))-1)/(2*p),(2*np.arange(1,p+1)-1)/(2*p))
+#Number of increments
+N_x = int((end[0]-start[0])/dx)
+# N_v = int((end[1]-start[1])/h_v)
 
 
-'''Calculate equilibrium state'''
-def equilibrium(f,N_x,N_v):
-    out = np.zeros(len(f))
-    F = to_matrix(f,N_x,N_v)
-    rho = np.sum(F,axis=0)
-    M_v = M()
-    for j in range(N_v+1):
-        out[j*(N_x+1):(j+1)*(N_x+1)] = M_v[j]*rho
-    return out
+'''-----------Deterministic solver of kinetic equation(Not AP, but standard)--------------'''
 
+def initialise_kinetic():
+    f = np.zeros((N_x,2*p)) #Vector f_hat
+    err = 1e-4
+    for i,x in enumerate(x_axis):
+        for j,v in enumerate(v_axis):
+            in_d = (x<=(0.5+err) and x>=-(0.5+err))*(v>=-(0.75+err) and v<=(0.25+err))
+            f[i,j] = dx*dv*in_d + 0.5*dx*dv*(not in_d)
+    return f
 
+'''Instead of advection matrix'''
+def Advection_CD():
+    '''relevant indexes for advection term in kinetic equation when using central
+    difference scheme and periodic boundary conditions'''
+    ileft = np.append(np.array([N_x-1]),np.arange(0,N_x-1))
+    iright = np.append(np.arange(1,N_x),np.array([0]))
+    return ileft,iright
 
 '''Use Backward for transport step and forward Euler for collision step
  to solve f_t + v/eps*f_x = 1/eps**2(M*rho-f)'''
-I_t = (0,1)
-dt = 0.01
-steps = int((I_t[1]-I_t[0])/dt)
-A_inv = np.linalg.inv(np.identity((N_x+1)*(N_v+1))+dt*block_multiply(A,v)/eps)
-for i in range(steps):
-    f = np.matmul(A_inv,f) #Transport step
-    f = f+ dt/eps**2*(equilibrium(f,N_x,N_v)-f) #Collision step
-print(f)
+def kinetic_FE():
+    d = 1/3
+    nu = 0.1
+    dt = nu*dx**2/d
+    v = v_axis.copy()
+    f = initialise_kinetic()
+    ileft,iright = Advection_CD()
+    '''Forward Euler discretization of kinetic equation'''
+    steps = int((I_t[1]-I_t[0])/dt)
+    # A_inv = np.linalg.inv(np.identity((N_x+1)*(N_v+1))+dt*block_multiply(A,v)/eps)
+    for i in range(steps):
+        f = f - dt/eps*(v*(f[ileft,:]-f[iright,:]))/(2*dx)#np.matmul(A_inv,f) #Transport step
+        f = f+ dt/eps**2*(np.sum(f,axis=1)-f)#(equilibrium(f,N_x,N_v)-f) #Collision step
+    rho = np.sum(f,axis=1)
+    plt.plot(x_axis,rho)
+    plt.show()
+
+
+'''---------Deterministic solver of heat equation------------'''
+
+def diffusive_CD():
+    '''relevant indexes for diffusion term in heat equation when using central
+    difference scheme and periodic boundary conditions'''
+    ileft = np.append(np.array([N_x-1]),np.arange(0,N_x-1))
+    icentral = np.arange(0,N_x)
+    iright = np.append(np.arange(1,N_x),np.array([0]))
+    return ileft,icentral,iright
+
+def initialise_diffusive():
+    '''Initialise rho in heat equation'''
+    rho = np.zeros(N_x)
+    err = 1e-5 #tolerance for comparison of floats
+    for i,x in enumerate(x_axis*eps):
+        if x>-(0.5-err)*eps and x<(0.5-err)*eps:
+            rho[i] = dx
+        elif (x>=-(0.5+err)*eps and x<=-(0.5-err)*eps) or (x<=(0.5+err)*eps and x>=(0.5-err)*eps):
+            rho[i] = 3/4*dx
+        else:
+            rho[i] = dx/2
+    return rho
+
+def diffusive_FE():
+    '''Solve heat equation with forward Euler time discretization
+    This method solves for rho and not rho_{epsilon}. To make sure that
+    rho_{epsilon}(x,t=2.5) is obtained, the x_axis must be scaled by 1/epsilon and
+    the time must be scaled by 1/epsilon^2'''
+    global dx
+    d = 1/3
+    nu = 0.3
+    dx = dx*eps
+    dt = nu*dx**2/d
+    # print(dt)
+    rho = initialise_diffusive()
+    # plt.plot(x_axis,rho)
+    # plt.show()
+    ileft,icentral,iright = diffusive_CD()
+    t = I_t[0]; T = I_t[1]*eps**2
+    while t<T:
+        rho = rho + dt*d/(dx**2)*(rho[iright]-2*rho[icentral]+rho[ileft])
+        t+=dt
+    rho = np.append(rho,rho[0])
+    plt.plot(np.append(x_axis,end[0]),rho)
+    plt.show()
+
+'''---------Deterministic solver of altered heat equation with solution given below------------'''
+'''Altered equation is: u_t = u_{xx} + b(x,t), x in [-1,1)'''
+
+def heat_altered():
+    rho_ref = lambda t,x: np.exp(-t)*np.cos(5*np.pi*x)
+    b = lambda t,x: (25*np.pi**2-1)*np.exp(-t)*np.cos(5*np.pi*x)
+    rho = rho_ref(0,x_axis)
+    ileft,icentral,iright = diffusive_CD()
+    t = 0; T = 2
+    dt = dx**2/2
+    while t<T:
+        rho = rho + dt*((rho[ileft]-2*rho[icentral]+rho[iright])/dx**2 + b(t,x_axis))
+        t += dt
+    plt.plot(x_axis,rho,label='numerical solution')
+    plt.plot(x_axis,rho_ref(t,x_axis),label='exact solution')
+    plt.ylim(-1,1)
+    plt.legend()
+    plt.show()
+
+
+
+
+
+'''----------Simulation of heat equation(asymptotic limit) via MC method with d = <v^2>----------'''
+def Q(N):
+    x = np.zeros(N); v = np.zeros(N)
+    U = np.random.uniform(size = int(N/3))
+    x[:int(2*N/3)] = np.random.uniform(-0.5,0.5,size=int(2*N/3))
+    x[int(2*N/3):] = (U<=0.5)* np.random.uniform(-1.0,-0.5,size=int(N/3)) + (U>0.5)* np.random.uniform(0.5,1.0,size=int(N/3))
+    U = np.random.uniform(size = int(N/3))
+    v[:int(2*N/3)] = np.random.uniform(-0.75,0.25,size=int(2*N/3))
+    # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
+    v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
+    return x,v
+
+@njit(nogil=True)
+def boundary(x):
+    x0 = start[0]*eps; xL = end[0]*eps
+    l = xL-x0 #Length of x domain
+    I_low = (x<x0); I_high = (x>=xL);
+    x[I_low] = xL-((x0-x[I_low])%l)
+    x[I_high] = x0 + ((x[I_high]-xL)%l)
+    return x
+
+njit(nogil=True)
+def heat_MC():
+    # global dx
+    # dx = dx
+    d = 1/3#np.sum(v**2)/(2*p)
+    nu = 0.3
+    dt = 1e-3#nu*dx**2/d
+    N = 1_500_000
+    # X,V = Q(N)
+    X = test1(N);V = np.random.uniform(start[1],end[1],size=N)
+    X = X*eps
+    t = 0
+    while t<0.1*eps:
+        X = X + np.sqrt(d*dt)*np.random.normal(0,1,size=N)
+        X = boundary(X)
+        t+=dt
+    X = X/eps
+    return X
+
+
+
+if __name__ == '__main__':
+    # diffusive_FE()
+    # heat_altered()
+    # kinetic_FE()
+    X = heat_MC()
+    dist = pd.DataFrame(data={'x':X})
+    sns.kdeplot(data=dist, x="x",cut=0)
+    plt.show()
