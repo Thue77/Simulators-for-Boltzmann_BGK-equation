@@ -17,7 +17,7 @@ def psi_c(x,v,dt,eps,u,B,v_tilde,r=1,v_bar = None):
     '''
     p = (u>=eps**2/(eps**2+dt*r)) #1 if collision occurs
     if v_bar is None:
-        v_bar = B(x)
+        _,v_bar = B(x) 
         # print(f'v_bar: {v_bar}, v: {v}')
     v = (1-p)*v + v_char(dt,eps,v_tilde)*p*v_bar
     # if dt ==1: print(1-p)

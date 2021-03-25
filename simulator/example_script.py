@@ -51,8 +51,8 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # print('Her')
         v_norm = np.random.normal(0,1,size=N)
         v = mu(x) + sigma(x)*v_norm
-    else:
-        x = test1(N); v = np.random.uniform(v_lim[0],v_lim[1],size=N)
+    elif test == 'num_exp_homo':
+        x = test1(N); v = np.random.uniform(-1,1,size=N)/epsilon
         # x = np.zeros(N); v = np.zeros(N)
         # U = np.random.uniform(size = int(N/3))
         # x[:int(2*N/3)] = np.random.uniform(-0.5,0.5,size=int(2*N/3))
@@ -61,7 +61,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # v[:int(2*N/3)] = np.random.uniform(-0.75,0.25,size=int(2*N/3))
         # # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
         # v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
-        v_norm = v
+        v_norm = v.copy()
     return x,v,v_norm
 
 #sets the collision rate
@@ -167,7 +167,7 @@ def mu(x):
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 0
     elif test == 'num_exp_homo':
-        return 1/2
+        return 0#1/(2*epsilon)
 
 
 def sigma(x):
@@ -176,11 +176,13 @@ def sigma(x):
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 1
     elif test == 'num_exp_homo':
-        return 1/3
+        return np.sqrt(1/3)/epsilon
+
+
 def M(x):
     if test == 'num_exp_homo':
-        v_norm = np.random.uniform(-1,1,size=len(x))
-        v_next = v_norm.copy()
+        v_norm = np.random.uniform(-1,1,size=len(x))#/epsilon
+        v_next = v_norm/epsilon
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = mu(x) + sigma(x)*v_norm
@@ -188,11 +190,11 @@ def M(x):
 
 @njit(nogil=True)
 def boundary_periodic(x):
-    x0 = 0; xL = 1
+    x0 = 0; xL = 1#/epsilon
     l = xL-x0 #Length of x domain
-    I_low = (x<x0); I_high = (x>=xL);
-    x[I_low] = xL-((x0-x[I_low])%l)
-    x[I_high] = x0 + ((x[I_high]-xL)%l)
+    I_low = (x<x0); I_high = (x>xL);
+    x[I_low] = x[I_low] + l#xL-((x0-x[I_low])%l)
+    x[I_high] = x[I_high] - l#x0 + ((x[I_high]-xL)%l)
     return x
 
 
@@ -457,11 +459,11 @@ if __name__ == '__main__':
         x_lim = (0,1); v_lim = (-1,1)
         # N_x,N_v = 20,10
         # SP = Omega(x_lim,v_lim,N_x,N_v)
-        N = 200_000
+        N = 400_000
         # boundary = lambda x: (x<x_lim[0])*x_lim[1] +(x>=x_lim[1])*x_lim[0] + (x<=x_lim[1])*(x>=x_lim[0])*x
         # print(boundary(np.array([-1.2,0.9,0.3,1.4])))
         # sys.exit()
-        B = lambda x: np.random.uniform(v_lim[0],v_lim[1],size=len(x))
+        # B = lambda x: np.random.uniform(v_lim[0],v_lim[1],size=len(x))
         # x,v,_ = Q(N)
         # print(v)
         # t = 0; dt = 0.005
@@ -471,14 +473,28 @@ if __name__ == '__main__':
         #     t += dt
         dt = 0.005;t0=0;T=0.1
         if False:
-            x = APSMC(dt,t0,T,N,epsilon,Q,B,boundary=boundary_periodic)
-        else:
+            x = APSMC(dt,t0,T,N,epsilon,Q,M,boundary=boundary_periodic)
+        elif True:
             x0,v0,_ = Q(N)
-            e = np.random.exponential(size=N); tau = SC(x0,v0,e)
-            x = KDMC(dt,x0,v0,e,tau,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
+            # e = np.random.exponential(size=N); tau = SC(x0,v0,e)
+            x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
+        elif False:
+            t = t0
+            dt = min(epsilon**2/2,dt)
+            print(dt)
+            x,v,_ = Q(N)
+            v = v*epsilon
+            dist = pd.DataFrame(data={'x':x})
+            sns.kdeplot(data=dist, x="x",cut=0,label='Initial')
+            while t<T:
+                x,v = phi_SS(x,v,dt,epsilon)
+                x = boundary_periodic(x)
+                t += dt
+        else:
+            x = Kinetic(N,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
         # print(x)
         # rho = SP.density_estimation(x)
-        # x=x/epsilon
+        # x=x*epsilon
         dist = pd.DataFrame(data={'x':x})
         sns.kdeplot(data=dist, x="x",cut=0)
         # plt.plot(SP.x_axis,rho)
