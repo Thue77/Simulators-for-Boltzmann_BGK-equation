@@ -43,7 +43,7 @@ def phi_APS(x,v,dt,eps,z,u,B,r=1,v_next=None,boundary=None,sigma=None):
         x = boundary(x)
     v,v_bar = psi_c(x,v,dt,eps,u,B,v_tilde,r,v_next)
     return x,v,v_bar
-# jit_module(nopython=True,nogil=True)
+jit_module(nopython=True,nogil=True)
 
 def phi_SS(x,v,dt,eps):
     # x = v/eps*dt
