@@ -197,16 +197,6 @@ def boundary_periodic(x):
     return x
 
 
-'''Methods only for splitting methods'''
-
-'''Distribution for splitting methods. Divided into standardized and non-standardized
-versions'''
-
-def B(x,v_char):
-    v_norm = np.random.uniform(-1,1,size=len(x))/np.sqrt(1/3)
-    return v_norm,v_norm
-
-
 
 jit_module(nopython=True,nogil=True)
 
