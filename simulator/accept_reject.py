@@ -40,10 +40,10 @@ def test1(N=10_000):
 
 
 if __name__ == '__main__':
-    X = test1()
+    X = test1(N=30_000)
     rho = lambda x: 1+np.cos(2*np.pi*(x+0.5))
-    dist = pd.DataFrame(data={'x':X})
-    sns.kdeplot(data=dist, x="x")
-    plt.plot(np.arange(0,1,0.001),rho(np.arange(0,1,0.001)),label='exact')
-    plt.legend()
+    dist = pd.DataFrame(data={'x':X,'q(x)':['Estimation of p(x)' for _ in range(len(X))]})
+    sns.kdeplot(data=dist, x="x",hue='q(x)',linestyle='dashed')
+    plt.plot(np.arange(0,1,0.001),rho(np.arange(0,1,0.001)),label='p(x)')
+    plt.legend(labels=['Estimated p(x)','p(x)'])
     plt.show()

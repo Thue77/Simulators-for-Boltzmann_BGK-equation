@@ -48,13 +48,13 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
             var_d += [np.var(x_f-x_c)]
             var_f += [np.var(x_f)]
             var_c += [np.var(x_c)]
-    # if plot:
-    #     plt.plot(np.arange(0,T+dt_f,dt_f),X_f,'.-')
-    #     plt.plot(np.arange(0,T+dt_c,dt_c),X_c,'.-')
-    #     plt.plot([t for t,_ in C1],[x[0] for _,x in C1],'*',color='blue')
-    #     plt.plot([t for t,_ in C2],[x[0] for _,x in C2],'*',color='red')
-    #     plt.grid(color='black', lw=1.0)
-    #     plt.show()
+    if plot:
+        plt.plot(np.arange(0,T+dt_f,dt_f),X_f,'.-')
+        plt.plot(np.arange(0,T+dt_c,dt_c),X_c,'.-')
+        plt.plot([t for t,_ in C1],[x[0] for _,x in C1],'*',color='blue')
+        plt.plot([t for t,_ in C2],[x[0] for _,x in C2],'*',color='red')
+        plt.grid(color='black', lw=1.0)
+        plt.show()
     # if plot_var:
     #     plt.plot(np.arange(0,11),var_d,'.-',label='Diff')
     #     plt.plot(np.arange(0,11),var_f,'.-',label='Fine')

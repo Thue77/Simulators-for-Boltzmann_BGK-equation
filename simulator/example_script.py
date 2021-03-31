@@ -357,10 +357,25 @@ def test_level_selection(plot=True):
     plt.plot(dt_list[levels],V,'.',color='black',label='Selected levels')
     plt.xscale('log')
     plt.yscale('log')
+    plt.xlabel('\u0394 t')
+    plt.ylabel('variance')
     plt.legend()
     plt.show()
     print(f'levels: {levels}')
 
+def test_num_exp_hom_MC():
+    '''Plot results for numerical example based on radiative transport'''
+    df = pd.DataFrame(data={'x':[],'Diffusion paramter':[]})
+    for eps in [0.01,0.5,1.0]:
+        x = np.loadtxt(f'APS_eps_{eps}.txt')
+        df = df.append(pd.DataFrame(data={'x':x,'Diffusion paramter':[f'epsilon = {eps}' for _ in range(len(x))]}))
+    sns.kdeplot(data=df, x="x",hue='Diffusion paramter',cut=0,linestyle='--',common_norm=False)
+    '''Repeat for KDMC'''
+    df = pd.DataFrame(data={'x':[],'Diffusion paramter':[]})
+    for eps in [0.01,0.5,1.0]:
+        x = np.loadtxt(f'KDMC_eps_{eps}.txt')
+        df = df.append(pd.DataFrame(data={'x':x,'Diffusion paramter':[f'epsilon = {eps}' for _ in range(len(x))]}))
+    sns.kdeplot(data=df, x="x",hue='Diffusion paramter',cut=0,linestyle='dotted',common_norm=False)
 
 def KDML_test():
     E,V,C,N,levels = KDML(1e-3,Q,0,1,mu,sigma,M,R,SC,R_anti,dR,tau=None,L=22,N_warm = 10)
@@ -379,8 +394,6 @@ def Kinetic_test():
     x = Kinetic(N,Q,0,1,mu,sigma,M,R,SC)
     print(f'Kinetic result: {np.mean(x)}')
 
-def compare_APS_kinetic():
-    return None
 
 
 '''Exists in separate file as well'''
@@ -424,15 +437,6 @@ def kill_numba_cache():
 
 
 if __name__ == '__main__':
-    # os.environ['NUMBA_DISABLE_JIT'] = '1'
-    # print(dir(one_step))
-    # e = 2; x=5; v = 0;
-    # print(f'Before recompile of R \n SC= {SC(x,v,e)}, R={R(x)}')
-    # update_a(4)
-    # SC.recompile()
-    # print(f'After recompile of R \n SC= {SC(x,v,e)}, R={R(x)}')
-    # a = 4
-    # print(f'Outside: {R(10)}')
     if test == 'figure 4' and type == 'default':
         K = input('Cor or MC?\n')
         if K == 'MC':
@@ -456,15 +460,20 @@ if __name__ == '__main__':
         KDML_test()
         # Kinetic_test()
     elif test == 'num_exp_homo' and type=='default':
+        '''Numerical experiemnt on radiative transport with
+        rho(x,0) = 1+cos(2*pi*(x+0.5)) and V ~ U(-1,1)'''
         x_lim = (0,1); v_lim = (-1,1)
         N = 400_000
         dt = 0.005;t0=0;T=0.1
-        if True:
+        test_num_exp_hom_MC()
+        if False:
             x = APSMC(dt,t0,T,N,epsilon,Q,M,boundary=boundary_periodic,sigma=sigma)
+            # np.savetxt(f'APS_eps_{epsilon}.txt',x)
         elif False:
             x0,v0,_ = Q(N)
             # e = np.random.exponential(size=N); tau = SC(x0,v0,e)
             x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
+            np.savetxt(f'KDMC_eps_{epsilon}.txt',x)
         elif False:
             t = t0
             # dt = min(epsilon**2/2,dt)
@@ -482,8 +491,8 @@ if __name__ == '__main__':
         # print(x)
         # rho = SP.density_estimation(x)
         # x=x*epsilon
-        dist = pd.DataFrame(data={'x':x})
-        sns.kdeplot(data=dist, x="x",cut=0)
+        # dist = pd.DataFrame(data={'x':x})
+        # sns.kdeplot(data=dist, x="x",cut=0)
         # plt.plot(SP.x_axis,rho)
         plt.show()
 
