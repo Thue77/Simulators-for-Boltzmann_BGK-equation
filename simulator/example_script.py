@@ -35,6 +35,7 @@ print(f'a={a}, b={b},type={type}, test={test}')
 
 #Inintial distribution of position and velocity
 def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
+    '''Initial distribution for (x,v)'''
     if test == 'figure 4':
         # np.random.seed(4208)
         U = np.random.uniform(0,1,size=N)
@@ -51,7 +52,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # print('Her')
         v_norm = np.random.normal(0,1,size=N)
         v = mu(x) + sigma(x)*v_norm
-    elif test == 'num_exp_homo':
+    elif test == 'num_exp_hom':
         x = test1(N); v = np.random.uniform(-1,1,size=N)/epsilon
         # x = np.zeros(N); v = np.zeros(N)
         # U = np.random.uniform(size = int(N/3))
@@ -62,6 +63,13 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
         # v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
         v_norm = v/sigma(x)
+    return x,v,v_norm
+
+def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
+    '''Initial distribution for (x,nu)'''
+    if test == 'num_exp_hom':
+        x = test1(N); v = np.random.uniform(-1,1,size=N)
+        v_norm = v.copy()
     return x,v,v_norm
 
 #sets the collision rate
@@ -166,7 +174,7 @@ def mu(x):
         return 0
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 0
-    elif test == 'num_exp_homo':
+    elif test == 'num_exp_hom':
         return 0#1/(2*epsilon)
 
 
@@ -175,17 +183,33 @@ def sigma(x):
         return 1/epsilon
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 1
-    elif test == 'num_exp_homo':
+    elif test == 'num_exp_hom':
         return np.sqrt(1/3)/epsilon
 
 def M(x):
-    if test == 'num_exp_homo':
+    '''Distribution of velocity scaled by epsilon, i.e. v'''
+    if test == 'num_exp_hom':
+        # v_norm = np.random.uniform(0,1)
+        # v_next = (1-v_norm*2)/epsilon
         v_next = np.random.uniform(-1,1,size=len(x))/epsilon
         v_norm = v_next/sigma(x)
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = mu(x) + sigma(x)*v_norm
     return v_next,v_norm
+
+def M_nu(x):
+    '''Distribution of velocity NOT scaled by epsilon, i.e. nu'''
+    if test == 'num_exp_hom':
+        # v_norm = np.random.uniform(0,1)
+        # v_next = (1-v_norm*2)/epsilon
+        v_next = np.random.uniform(-1,1,size=len(x))
+        v_norm = v_next.copy()
+    else:
+        v_norm = np.random.normal(0,1,size=x.size)
+        v_next = mu(x) + sigma(x)*v_norm
+    return v_next,v_norm
+
 
 @njit(nogil=True)
 def boundary_periodic(x):
@@ -459,15 +483,15 @@ if __name__ == '__main__':
     elif test == 'KDML' and (type == 'B1' or type == 'B2'):
         KDML_test()
         # Kinetic_test()
-    elif test == 'num_exp_homo' and type=='default':
+    elif test == 'num_exp_hom' and type=='default':
         '''Numerical experiemnt on radiative transport with
         rho(x,0) = 1+cos(2*pi*(x+0.5)) and V ~ U(-1,1)'''
         x_lim = (0,1); v_lim = (-1,1)
         N = 400_000
         dt = 0.005;t0=0;T=0.1
-        test_num_exp_hom_MC()
-        if False:
-            x = APSMC(dt,t0,T,N,epsilon,Q,M,boundary=boundary_periodic,sigma=sigma)
+        # test_num_exp_hom_MC()
+        if True:
+            x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
             # np.savetxt(f'APS_eps_{epsilon}.txt',x)
         elif False:
             x0,v0,_ = Q(N)
@@ -491,8 +515,8 @@ if __name__ == '__main__':
         # print(x)
         # rho = SP.density_estimation(x)
         # x=x*epsilon
-        # dist = pd.DataFrame(data={'x':x})
-        # sns.kdeplot(data=dist, x="x",cut=0)
+        dist = pd.DataFrame(data={'x':x})
+        sns.kdeplot(data=dist, x="x",cut=0)
         # plt.plot(SP.x_axis,rho)
         plt.show()
 
