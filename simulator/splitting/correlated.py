@@ -1,9 +1,9 @@
 import numpy as np
-from one_step import phi_APS,v_char
+from .one_step import phi_APS
 import matplotlib.pyplot as plt
 from numba import njit,jit_module,prange
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
@@ -14,10 +14,11 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
     M: velocity distribution
     '''
     dt_c = dt_f*M_t
-    x_f,_,v_bar_f = Q(N)
-    v_f = v_char(dt_f,eps)*v_bar_f; v_c = v_char(dt_c,eps)*v_bar_f
+    x_f,_,v_f = Q(N)
+    # v_f = v_char(dt_f,eps)*v_bar_f; v_c = v_char(dt_c,eps)*v_bar_f
     x_c = x_f.copy()
-    v_bar_c = v_bar_f.copy()
+    v_bar_c = v_f.copy()
+    v_c = v_f.copy()
     if plot_var:
         var_d = [0]
         var_f = [0]
@@ -29,14 +30,14 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
         C2 = [(0.0,np.array([0.0]))]
     while t<T:
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
-        C = (U>=eps**2/(eps**2+dt_f*r)) #Indicates if collisions hppen
+        C = (U>=eps**2/(eps**2+dt_f*r)) #Indicates if collisions happen
         for m in range(M_t):
             x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r)
-            v_bar_c[C[:,m]] = v_bar_f[C[:,m]]
+            v_bar_c[C[:,m]] = v_f[C[:,m]]#v_bar_f[C[:,m]]
             # print(f'v_last: {v_last}')
             if plot:
                 X_f += [x_f]
-                if C: C1 += [(t+(m+1)*dt_f,x_f)]
+                if C[:,m]: C1 += [(t+(m+1)*dt_f,x_f)]
         z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
         u_c = max_np(U,axis=1)**M_t
         x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c)

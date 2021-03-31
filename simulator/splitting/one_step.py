@@ -11,7 +11,7 @@ def psi_t(x,v,dt,eps,z,r=1):
     '''The characteristic velocity is not included in the diffusion coefficient
     and must be divided out'''
     D = v**2*dt/(eps**2+dt*r)#(v*(eps**2+dt*r)/eps)**2*dt/(eps**2+dt*r)
-    return x + eps/(eps**2+dt*r)*v*dt + np.sqrt(2*dt*D)*z#v*dt + np.sqrt(2*dt*D)*z
+    return x + eps/(eps**2+dt*r)*v*dt# + np.sqrt(2*dt*D)*z#v*dt + np.sqrt(2*dt*D)*z
 
 def psi_c(x,v,dt,eps,u,B,r=1,v_bar = None):
     '''
