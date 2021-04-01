@@ -11,13 +11,15 @@ def psi_t(x,v,dt,eps,z,r=1):
     '''The characteristic velocity is not included in the diffusion coefficient
     and must be divided out'''
     D = v**2*dt/(eps**2+dt*r)#(v*(eps**2+dt*r)/eps)**2*dt/(eps**2+dt*r)
-    return x + eps/(eps**2+dt*r)*v*dt# + np.sqrt(2*dt*D)*z#v*dt + np.sqrt(2*dt*D)*z
+    A = eps/(eps**2+dt*r)*v
+    return x + A*dt + np.sqrt(2*dt*D)*z#v*dt + np.sqrt(2*dt*D)*z
 
 def psi_c(x,v,dt,eps,u,B,r=1,v_bar = None):
     '''
     u: vector of uniform numbers in [0,1] to sample from M with appropriate probability
     '''
     p = (u>=eps**2/(eps**2+dt*r)) #1 if collision occurs
+    # print(f'dt: {dt}, prob: {1-eps**2/(eps**2+dt*r)}')
     if v_bar is None:
         _,v_bar = B(x)
 
@@ -43,7 +45,7 @@ def phi_APS(x,v,dt,eps,z,u,B,r=1,v_next=None,boundary=None):
         x = boundary(x)
     v,v_bar = psi_c(x,v,dt,eps,u,B,r,v_next)
     return x,v,v_bar
-jit_module(nopython=True,nogil=True)
+# jit_module(nopython=True,nogil=True)
 
 def phi_SS(x,v,dt,eps):
     # x = v/eps*dt

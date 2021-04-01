@@ -3,8 +3,33 @@ from .one_step import phi_APS
 import matplotlib.pyplot as plt
 from numba import njit,jit_module,prange
 
-# @njit(nogil=True)
+@njit(nogil=True)
 def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
+    '''
+    M_t: defined s.t. dt_c=M_t dt_f
+    t: starting time
+    eps: diffusive parameter
+    N: number of paths
+    Q: Initial distribution
+    M: velocity distribution
+    '''
+    dt_c = dt_f*M_t
+    x_f,_,v_f = Q(N)
+    x_c = x_f.copy()
+    v_bar_c = v_f.copy()
+    v_c = v_f.copy()
+    while t<T:
+        Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
+        C = (U>=eps**2/(eps**2+dt_f*r)) #Indicates if collisions happen
+        for m in range(M_t):
+            x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r)
+            v_bar_c[C[:,m]] = v_f[C[:,m]]
+        z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
+        u_c = max_np(U,axis=1)**M_t
+        x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c)
+        t += dt_c
+    return x_f,x_c
+def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -31,6 +56,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
     while t<T:
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
         C = (U>=eps**2/(eps**2+dt_f*r)) #Indicates if collisions happen
+        # print(f'probability = {1-eps**2/(eps**2+dt_f*r)}')
         for m in range(M_t):
             x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r)
             v_bar_c[C[:,m]] = v_f[C[:,m]]#v_bar_f[C[:,m]]
@@ -52,16 +78,19 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
     if plot:
         plt.plot(np.arange(0,T+dt_f,dt_f),X_f,'.-')
         plt.plot(np.arange(0,T+dt_c,dt_c),X_c,'.-')
-        plt.plot([t for t,_ in C1],[x[0] for _,x in C1],'*',color='blue')
-        plt.plot([t for t,_ in C2],[x[0] for _,x in C2],'*',color='red')
+        plt.plot([t for t,_ in C1],[x[0] for _,x in C1],'x',color='blue')
+        plt.plot([t for t,_ in C2],[x[0] for _,x in C2],'x',color='red')
+        print(f'C1: {C1} \n C2: {C2}')
         plt.grid(color='black', lw=1.0)
         plt.show()
-    # if plot_var:
-    #     plt.plot(np.arange(0,11),var_d,'.-',label='Diff')
-    #     plt.plot(np.arange(0,11),var_f,'.-',label='Fine')
-    #     plt.plot(np.arange(0,11),var_c,'.-',label='Coarse')
-    #     plt.legend()
-    #     plt.show()
+    if plot_var:
+        plt.plot(np.arange(0,11),var_d,'.-',color='green',label='Difference')
+        plt.plot(np.arange(0,11),var_f,'.-',color='blue',label='Fine')
+        plt.plot(np.arange(0,11),var_c,'.-',color='orange',label='Coarse')
+        plt.xlabel('Time')
+        plt.ylabel('Variance')
+        plt.legend(title='Type of path')
+        plt.show()
     return x_f,x_c
 
 @njit(nogil=True)

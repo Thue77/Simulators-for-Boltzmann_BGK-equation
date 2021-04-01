@@ -7,6 +7,7 @@ from kinetic_diffusion.ml import ml as KDML
 from splitting.mc import mc as APSMC
 from splitting.one_step import phi_SS
 from splitting.correlated import correlated as AP_C
+from splitting.correlated import correlated_test as AP_C_test
 from accept_reject import test1
 from space import Omega
 from AddPaths import Sfunc,delta,x_hat
@@ -504,8 +505,8 @@ if __name__ == '__main__':
         x_lim = (0,1); v_lim = (-1,1)
         N = 400_000
         dt = 0.005;t0=0;T=0.1
-        test_num_exp_hom_MC()
-        if False:
+        # test_num_exp_hom_MC()
+        if True:
             x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
             # np.savetxt(f'APS_eps_{epsilon}.txt',x)
         elif False:
@@ -530,15 +531,21 @@ if __name__ == '__main__':
         # print(x)
         # rho = SP.density_estimation(x)
         # x=x*epsilon
-        # dist = pd.DataFrame(data={'x':x})
-        # sns.kdeplot(data=dist, x="x",cut=0)
+        dist = pd.DataFrame(data={'x':x})
+        sns.kdeplot(data=dist, x="x",cut=0)
         # plt.plot(SP.x_axis,rho)
         plt.show()
     elif test == 'corr_path' and type=='Goldstein-Taylor':
         '''Plot the fine and coarse path of the APML method under the Goldstein-
         Taylor model to compare with article on APML. Set epsilon = 0.5'''
         dt_f = 0.2;M_t=5;t=0;T=10;N=1
-        AP_C(dt_f,M_t,t,T,epsilon,N,Q_nu,M_nu,plot=True)
+        AP_C_test(dt_f,M_t,t,T,epsilon,N,Q_nu,M_nu,plot=True)
+    elif test == 'var_path' and type=='Goldstein-Taylor':
+        '''Plot the variance fine and coarse paths and their difference of the
+        APML method under the Goldstein-Taylor model to compare with article on APML.
+        Set epsilon = 0.5'''
+        dt_f = 0.2;M_t=5;t=0;T=10;N=100_000
+        AP_C_test(dt_f,M_t,t,T,epsilon,N,Q_nu,M_nu,plot_var=True)
 
 
 
