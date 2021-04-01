@@ -47,7 +47,7 @@ def select_levels_data(data):
     return L_set,V_out
 
 
-@njit(nogil=True,parallel=True)
+# @njit(nogil=True,parallel=True)
 def warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
     dt_list = 1/2**np.arange(0,L+1)
     Q_l = np.zeros(L+1) #Estimates for all possible first levels
@@ -72,7 +72,7 @@ def warm_up(L,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,N=100,tau=None):
             V_l_L[l] = np.var(x_dif)
         with objmode(start2='f8'):
             start2 = time.perf_counter()
-        x = KDMC(dt_list[l],x0,v0,e,tau,0,T,mu,sigma,M,R,SC)
+        x = KDMC(dt_list[l],x0,v0,0,T,mu,sigma,M,R,SC)
         with objmode(end2='f8'):
             end2 = time.perf_counter()
         C_l[l] = (end2-start2)/N
@@ -169,7 +169,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100)
                     tau = SC(x0,v0,e) #Could maybe be implemented in KDMC
                     with objmode(start2 = 'f8'):
                         start2 = time.perf_counter()
-                    x = KDMC(dt_f,x0,v0,e,tau,t0,T,mu,sigma,M,R,SC,dR=dR)
+                    x = KDMC(dt_f,x0,v0,t0,T,mu,sigma,M,R,SC,dR=dR)
                     with objmode(end2 = 'f8'):
                         end2 = time.perf_counter()
                     C_temp = (end2-start2)/N_diff[i]
@@ -192,6 +192,6 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100)
         # print(f'New level: {L}')
         N_diff = np.append(N_diff,100).astype(np.int64)
         N = np.append(N,0).astype(np.int64)
-        E = np.append(E,0.0); V = np.append(V,0.0); C = np.append(C,0.0)
+        E = np.append(E,0.0); V = np.append(V,0.0); C = np.append(C,0.0); SS = np.append(SS,0.0)
         levels = np.append(levels,L)
     return E,V,C,N,levels

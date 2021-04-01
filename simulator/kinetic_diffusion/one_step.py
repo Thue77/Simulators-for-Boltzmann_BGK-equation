@@ -61,9 +61,14 @@ def phi_KD(dt,x0,v0,t,tau,z,mu,sigma,M,R,v_rv=None,dR=None,boundary=None):
     theta = dt - np.mod(tau,dt)
     '''When correlating paths the r.v. for the next step is given in the Coarse
         step by using the ones from the fine step. In that case v_rv is given'''
+    if v_rv is None:
+        v_next,v_norm = M(xp)
+    else:
+        v_norm = v_rv
+        v_next = mu(xp)+sigma(xp)* v_norm
+
     # v_norm = M(xp) if v_rv is None else v_rv
     # v_next = mu(xp)+sigma(xp)* v_norm
-    v_next,v_norm = M(xp)
     x,v,t = __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=dR)
     if boundary is not None: x = boundary(x)
     return x,v,t,v_norm

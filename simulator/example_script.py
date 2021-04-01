@@ -298,7 +298,7 @@ def KD_cor_test_fig_4(N):
     sns.kdeplot(data=dist, x="x")
     plt.show()
 
-@njit(nogil=True,parallel=True)
+# @njit(nogil=True,parallel=True)
 def KDML_cor_test_fig_5(N):
     '''
     epsilon is irrelevant
@@ -325,7 +325,10 @@ def KDML_cor_test_fig_5(N):
                 if i == len(dt_list)-2:
                     E[r,i+1] = np.mean(x_f)
                     V[r,i+1] = np.sum((x_f-E[r,i+1])**2)
-        return add_sum_of_squares_alongaxis(V,E,cache)/(N-1),add_sum_of_squares_alongaxis(V_d,E_bias,cache)/(N-1)
+        V_out,_ = add_sum_of_squares_alongaxis(V,E,cache)
+        V_d_out,_ = add_sum_of_squares_alongaxis(V_d,E_bias,cache)
+        return V_out/(N-1),V_d_out/(N-1)
+        # return add_sum_of_squares_alongaxis(V,E,cache)/(N-1),add_sum_of_squares_alongaxis(V_d,E_bias,cache)/(N-1)
     else:
         x0,v0,v_l1_next = Q(N)
         for i in prange(len(dt_list)-1):
@@ -337,16 +340,7 @@ def KDML_cor_test_fig_5(N):
         return V[0,:],V_d[0,:]
 
 
-@njit(nogil=True,parallel=True)
-def compute_mean_alongaxis(A,axis=0):
-    '''If axis is zero then the mean of each coulmn is calculated'''
-    n = A.shape[axis]
-    m = A.shape[0] if axis==1 else A.shape[1]
-    mu = np.zeros(m)
-    for j in prange(m):
-        for i in prange(n):
-            mu[j] = mu[j] + 1/(i+1)*(A[i,j]-mu[j])
-    return mu
+
 
 @njit(nogil=True,parallel=True)
 def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
@@ -358,14 +352,66 @@ def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
     n = A.shape[axis]
     m = A.shape[0] if axis==1 else A.shape[1]
     ss = A[0,:]
+    E = np.zeros(m)
     for j in prange(m):
         mu_old = A_mean[0,j]
-        for i in prange(n):
+        # print(mu_old)
+        for i in range(1,n):
             Delta = A_mean[i,j] - mu_old
             M = (N*(N*(i)))/(N+N*(i))
             ss[j] = ss[j] + A[i,j] + Delta**2*M
-            mu_old = mu_old + Delta*(N*i)/(N+N*(i))
-    return ss
+            mu_old = mu_old + Delta*(N*i)/(N+N*i)
+        E[j] = mu_old
+    return ss,E
+
+# @njit(nogil=True,parallel=True)
+# def compute_mean_alongaxis(A,axis=0):
+#     '''If axis is zero then the mean of each coulmn is calculated'''
+#     n = A.shape[axis]
+#     m = A.shape[0] if axis==1 else A.shape[1]
+#     mu = np.zeros(m)
+#     for j in prange(m):
+#         for i in prange(n):
+#             mu[j] = mu[j] + 1/(i+1)*(A[i,j]-mu[j])
+#     return mu
+#
+# @njit(nogil=True,parallel=True)
+# def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
+#     '''If axis is zero then the sum of squares of each coulmn is calculated
+#     A: matrix of sum of squares for each run
+#     A_mean: matrix of means for each run
+#     N: number of paths used in each run
+#     '''
+#     n = A.shape[axis]
+#     m = A.shape[0] if axis==1 else A.shape[1]
+#     ss = A[0,:]
+#     for j in prange(m):
+#         mu_old = A_mean[0,j]
+#         for i in prange(n):
+#             Delta = A_mean[i,j] - mu_old
+#             M = (N*(N*(i)))/(N+N*(i))
+#             ss[j] = ss[j] + A[i,j] + Delta**2*M
+#             mu_old = mu_old + Delta*(N*i)/(N+N*(i))
+#     return ss
+# @njit(nogil=True,parallel=True)
+# def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
+#     '''If axis is zero then the mean of each coulmn is calculated
+#     A: matrix of sum of squares for each run
+#     A_mean: matrix of means for each run
+#     N: number of paths used in each run
+#     '''
+#     n = A.shape[axis]
+#     m = A.shape[0] if axis==1 else A.shape[1]
+#     ss = np.zeros(m)
+#     for j in prange(m):
+#         mu_old = 0
+#         for i in prange(n):
+#             Delta = A_mean[i,j] - mu_old
+#             M = (N*(N*(i)))/(N+N*(i))
+#             ss[j] = ss[j] + A[i,j] + Delta**2*M
+#             mu_old = mu_old + Delta*(N*i)/(N+N*(i))
+#     return ss
+
 
 
 def test_warm_up(N=100,L=21):
@@ -483,15 +529,15 @@ if __name__ == '__main__':
             KDMC_test_fig_4(500_000)
         else:
             KD_cor_test_fig_4(100_000)
-    elif test == 'figure 5' and type == 'B1' or type == 'B2':
+    elif test == 'figure 5' and (type == 'B1' or type == 'B2'):
         print('Starting')
         KDML_cor_test_fig_5(10)
         start = time.time()
         V,V_d = KDML_cor_test_fig_5(N_global)
         print(f'elapsed time is {time.time()-start}')
-        np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
+        # np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
         # print(f'V: {V}')
-        # plot_var(V,V_d)
+        plot_var(V,V_d)
     elif test == 'warm_up' and (type == 'B1' or type == 'B2'):
         test_warm_up()
     elif test == 'select_levels' and (type == 'B1' or type == 'B2'):
@@ -506,10 +552,10 @@ if __name__ == '__main__':
         N = 400_000
         dt = 0.005;t0=0;T=0.1
         # test_num_exp_hom_MC()
-        if True:
+        if False:
             x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
             # np.savetxt(f'APS_eps_{epsilon}.txt',x)
-        elif False:
+        elif True:
             x0,v0,_ = Q(N)
             # e = np.random.exponential(size=N); tau = SC(x0,v0,e)
             x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
