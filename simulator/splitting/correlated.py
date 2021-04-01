@@ -179,7 +179,7 @@ if __name__ == '__main__':
     # dt_f=0.2;M_t=5;t=0;T=10;N=10_000;eps=0.5
     # x_f,x_c = correlated(dt_f,M_t,t,T,eps,N,lambda N: (np.zeros(N),1,np.ones(N)),B,plot_var=True)
     if True:
-        dt_0 = 2.5;M_t = 2;L=16;eps = 0.01
+        dt_0 = 2.5;M_t = 2;L=16;eps = 0.1
         dt_list = dt_0/M_t**np.arange(0,L+1)
         V,E,V_d,E_d = test_var(dt_0,L,M_t,0,5,eps,100_000,Q ,B)
         print(E_d)

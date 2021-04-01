@@ -298,7 +298,7 @@ def KD_cor_test_fig_4(N):
     sns.kdeplot(data=dist, x="x")
     plt.show()
 
-# @njit(nogil=True,parallel=True)
+@njit(nogil=True,parallel=True)
 def KDML_cor_test_fig_5(N):
     '''
     epsilon is irrelevant
@@ -340,7 +340,50 @@ def KDML_cor_test_fig_5(N):
         return V[0,:],V_d[0,:]
 
 
-
+@njit(nogil=True,parallel=True)
+def APML_cor_test_fig_5(N):
+    '''
+    epsilon is irrelevant
+    type = 'B1' or 'B2'
+    test = 'figure 5'
+    set a and b as desired
+    '''
+    M_t = 2; t=0;T=5
+    cache = 10_000
+    dt_list = 2.5/M_t**np.arange(0,17,1)
+    runs = int(max(N/cache,1))
+    n = cache#int(N/cache) if N>cache else N
+    V = np.zeros((runs,len(dt_list)-1)); E = np.zeros((runs,len(dt_list)-1))
+    V_d = np.zeros((runs,len(dt_list)-1)); E_d = np.zeros((runs,len(dt_list)-1))
+    if runs >1:
+        for r in prange(runs):
+            # x0,v0,v_l1_next = Q(n)
+            for i in range(len(dt_list)-1):
+                # print(dt_list[i])
+                x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,n,Q_nu,M_nu)
+                E_d[r,i] = np.mean(x_f**2-x_c**2)
+                V_d[r,i] = np.sum((x_f**2-x_c**2-E_d[r,i])**2)
+                E[r,i] = np.mean(x_c**2)
+                V[r,i] = np.sum((x_c**2-E[r,i])**2)
+                # if i == len(dt_list)-2:
+                #     E[r,i+1] = np.mean(x_f)
+                #     V[r,i+1] = np.sum((x_f-E[r,i+1])**2)
+        V_out,E_out = add_sum_of_squares_alongaxis(V,E,cache)
+        V_d_out,E_d_out = add_sum_of_squares_alongaxis(V_d,E_d,cache)
+        return V_out/(N-1),E_out,V_d_out/(N-1),np.abs(E_d_out)
+        # return add_sum_of_squares_alongaxis(V,E,cache)/(N-1),add_sum_of_squares_alongaxis(V_d,E_bias,cache)/(N-1)
+    else:
+        for i in prange(len(dt_list)-1):
+            # print(dt_list[i])
+            x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,N,Q_nu,M_nu)
+            V_d[0,i] = np.var(x_f**2-x_c**2)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
+            E_d[0,i] = np.mean(x_f**2-x_c**2)
+            V[0,i] = np.var(x_c**2)#np.sum((x_c-np.mean(x_c))**2)
+            E[0,i] = np.mean(x_c**2)
+            # if i == len(dt_list)-2:
+            #     V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
+            #     V[0,i+1] = np.mean(x_f)
+        return V[0,:],E[0,:],V_d[0,:],np.abs(E_d[0,:])
 
 @njit(nogil=True,parallel=True)
 def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
@@ -363,54 +406,6 @@ def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
             mu_old = mu_old + Delta*(N*i)/(N+N*i)
         E[j] = mu_old
     return ss,E
-
-# @njit(nogil=True,parallel=True)
-# def compute_mean_alongaxis(A,axis=0):
-#     '''If axis is zero then the mean of each coulmn is calculated'''
-#     n = A.shape[axis]
-#     m = A.shape[0] if axis==1 else A.shape[1]
-#     mu = np.zeros(m)
-#     for j in prange(m):
-#         for i in prange(n):
-#             mu[j] = mu[j] + 1/(i+1)*(A[i,j]-mu[j])
-#     return mu
-#
-# @njit(nogil=True,parallel=True)
-# def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
-#     '''If axis is zero then the sum of squares of each coulmn is calculated
-#     A: matrix of sum of squares for each run
-#     A_mean: matrix of means for each run
-#     N: number of paths used in each run
-#     '''
-#     n = A.shape[axis]
-#     m = A.shape[0] if axis==1 else A.shape[1]
-#     ss = A[0,:]
-#     for j in prange(m):
-#         mu_old = A_mean[0,j]
-#         for i in prange(n):
-#             Delta = A_mean[i,j] - mu_old
-#             M = (N*(N*(i)))/(N+N*(i))
-#             ss[j] = ss[j] + A[i,j] + Delta**2*M
-#             mu_old = mu_old + Delta*(N*i)/(N+N*(i))
-#     return ss
-# @njit(nogil=True,parallel=True)
-# def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
-#     '''If axis is zero then the mean of each coulmn is calculated
-#     A: matrix of sum of squares for each run
-#     A_mean: matrix of means for each run
-#     N: number of paths used in each run
-#     '''
-#     n = A.shape[axis]
-#     m = A.shape[0] if axis==1 else A.shape[1]
-#     ss = np.zeros(m)
-#     for j in prange(m):
-#         mu_old = 0
-#         for i in prange(n):
-#             Delta = A_mean[i,j] - mu_old
-#             M = (N*(N*(i)))/(N+N*(i))
-#             ss[j] = ss[j] + A[i,j] + Delta**2*M
-#             mu_old = mu_old + Delta*(N*i)/(N+N*(i))
-#     return ss
 
 
 
@@ -592,6 +587,30 @@ if __name__ == '__main__':
         Set epsilon = 0.5'''
         dt_f = 0.2;M_t=5;t=0;T=10;N=100_000
         AP_C_test(dt_f,M_t,t,T,epsilon,N,Q_nu,M_nu,plot_var=True)
+    elif test == 'var_structure' and type=='Goldstein-Taylor':
+        '''Plot the variance fine and coarse paths and their difference of the
+        APML method under the Goldstein-Taylor model to compare with article on APML.
+        Set epsilon = 0.5'''
+        N=100_000
+        M_t = 2
+        dt_list = 2.5/M_t**np.arange(0,17,1)
+        V,E,V_d,E_d=APML_cor_test_fig_5(N)
+        plt.figure(1)
+        plt.subplot(122)
+        plt.plot(dt_list[1:],V_d,label='Diff')
+        plt.plot(dt_list[1:],V,label='Single')
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.title('Variance')
+        plt.legend()
+        plt.subplot(121)
+        plt.plot(dt_list[1:],E_d,label='Diff')
+        plt.plot(dt_list[1:],E,label='Single')
+        plt.title('Mean')
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.legend()
+        plt.show()
 
 
 
