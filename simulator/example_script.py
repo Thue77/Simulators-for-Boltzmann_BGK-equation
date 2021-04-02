@@ -600,10 +600,10 @@ if __name__ == '__main__':
         # script_dir = os.path.dirname(__file__)
         # rel_path = f'var_results/var_eps_{epsilon}_type_{type}.txt'
         # abs_file_path = os.path.join(script_dir, rel_path)
-        # V,V_d = np.loadtxt(f'var_eps_{epsilon}_type_{type}.txt')
+        # V,V_d = np.loadtxt(abs_file_path)
         # rel_path = f'var_results/E_eps_{epsilon}_type_{type}.txt'
         # abs_file_path = os.path.join(script_dir, rel_path)
-        # E,E_d = np.loadtxt(f'E_eps_{epsilon}_type_{type}.txt')
+        # E,E_d = np.loadtxt(abs_file_path)
         plt.figure(1)
         plt.subplot(122)
         x2 = dt_list[10]; x1 = dt_list[13]
