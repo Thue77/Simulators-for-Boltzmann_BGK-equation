@@ -616,13 +616,13 @@ if __name__ == '__main__':
         plt.plot(np.tile(x1+x_end,5),y,color='black') #plot vertical line
         plt.text(x1+(x_end-x_start)/2,y[0]+0.00625*(y[-1]-y[0]),f'{round(slope)}') #plot slope
         plt.plot(x1+np.linspace(x_start,x_end,4),(x1+np.linspace(x_start,x_end,4))**slope*(y1/(x1+x_start)**slope),color='black') #plot diagonal line
-        plt.plot(dt_list[1:-2],V_d[:-2],label='Diff')
-        plt.plot(dt_list[1:-2],V[:-2],label='Single')
+        plt.plot(dt_list[1:],V_d,label='Diff')
+        plt.plot(dt_list[1:],V,'--',label='Single')
         plt.xscale('log')
         plt.yscale('log')
         plt.xlabel('\u0394 t')
         plt.ylabel('Variance')
-        plt.legend()
+        # plt.legend()
         plt.subplot(121)
         x2 = dt_list[10]; x1 = dt_list[13]
         y2 = E_d[9]; y1 = E_d[12]
@@ -635,13 +635,13 @@ if __name__ == '__main__':
         plt.plot(np.tile(x1+x_end,5),y,color='black') #plot vertical line
         plt.text(x1+(x_end-x_start)/2,y[0]+0.00625*(y[-1]-y[0]),f'{round(slope)}') #plot slope
         plt.plot(x1+np.linspace(x_start,x_end,4),(x1+np.linspace(x_start,x_end,4))**slope*(y1/(x1+x_start)**slope),color='black') #plot diagonal line
-        plt.plot(dt_list[1:-2],E_d[:-2],label='Diff')
-        plt.plot(dt_list[1:-2],E[:-2],label='Single')
+        plt.plot(dt_list[1:],E_d,label='Diff')
+        plt.plot(dt_list[1:],E,'--',label='Single')
         plt.ylabel('Mean')
         plt.xlabel('\u0394 t')
         plt.xscale('log')
         plt.yscale('log')
-        plt.legend()
+        # plt.legend()
         plt.show()
 
 
