@@ -590,23 +590,50 @@ if __name__ == '__main__':
     elif test == 'var_structure' and type=='Goldstein-Taylor':
         '''Plot the variance fine and coarse paths and their difference of the
         APML method under the Goldstein-Taylor model to compare with article on APML.
-        Set epsilon = 0.5'''
+        Set epsilon = 10,1,0.1'''
         N=100_000
         M_t = 2
         dt_list = 2.5/M_t**np.arange(0,17,1)
-        V,E,V_d,E_d=APML_cor_test_fig_5(N)
+        # V,E,V_d,E_d=APML_cor_test_fig_5(N)
+        # np.savetxt(f'var_eps_{epsilon}_type_{type}.txt',np.vstack((V,V_d)))
+        # np.savetxt(f'E_eps_{epsilon}_type_{type}.txt',np.vstack((E,E_d)))
+        V,V_d = np.loadtxt(f'var_eps_{epsilon}_type_{type}.txt')
+        E,E_d = np.loadtxt(f'E_eps_{epsilon}_type_{type}.txt')
         plt.figure(1)
         plt.subplot(122)
-        plt.plot(dt_list[1:],V_d,label='Diff')
-        plt.plot(dt_list[1:],V,label='Single')
+        x2 = dt_list[10]; x1 = dt_list[13]
+        y2 = V_d[9]; y1 = V_d[12]
+        slope = (math.log10(y2)-math.log10(y1))/(math.log10(x2)-math.log10(x1))
+        x_end = 2e-3;x_start=1e-4
+        plt.plot(x1+np.linspace(x_start,x_end,4),np.tile(y1,4),color='black') # plot horizontal line
+        t = math.log10(y1) + slope*(math.log10(x1+x_end)-math.log10(x1+x_start)) # top of triangle
+        y = np.linspace(y1,10**t,5)
+        plt.plot(np.tile(x1+x_end,5),y,color='black') #plot vertical line
+        plt.text(x1+(x_end-x_start)/2,y[0]+0.00625*(y[-1]-y[0]),f'{round(slope)}') #plot slope
+        plt.plot(x1+np.linspace(x_start,x_end,4),(x1+np.linspace(x_start,x_end,4))**slope*(y1/(x1+x_start)**slope),color='black') #plot diagonal line
+        plt.plot(dt_list[1:-2],V_d[:-2],label='Diff')
+        plt.plot(dt_list[1:-2],V[:-2],label='Single')
         plt.xscale('log')
         plt.yscale('log')
-        plt.title('Variance')
+        plt.xlabel('\u0394 t')
+        plt.ylabel('Variance')
         plt.legend()
         plt.subplot(121)
-        plt.plot(dt_list[1:],E_d,label='Diff')
-        plt.plot(dt_list[1:],E,label='Single')
-        plt.title('Mean')
+        x2 = dt_list[10]; x1 = dt_list[13]
+        y2 = E_d[9]; y1 = E_d[12]
+        slope = (math.log10(y2)-math.log10(y1))/(math.log10(x2)-math.log10(x1))
+        # y1 = y1-0.0038; #For epsilon=1
+        x_end = 1e-3;x_start=1e-4
+        plt.plot(x1+np.linspace(x_start,x_end,4),np.tile(y1,4),color='black') # plot horizontal line
+        t = math.log10(y1) + slope*(math.log10(x1+x_end)-math.log10(x1+x_start)) # top of triangle
+        y = np.linspace(y1,10**t,5)
+        plt.plot(np.tile(x1+x_end,5),y,color='black') #plot vertical line
+        plt.text(x1+(x_end-x_start)/2,y[0]+0.00625*(y[-1]-y[0]),f'{round(slope)}') #plot slope
+        plt.plot(x1+np.linspace(x_start,x_end,4),(x1+np.linspace(x_start,x_end,4))**slope*(y1/(x1+x_start)**slope),color='black') #plot diagonal line
+        plt.plot(dt_list[1:-2],E_d[:-2],label='Diff')
+        plt.plot(dt_list[1:-2],E[:-2],label='Single')
+        plt.ylabel('Mean')
+        plt.xlabel('\u0394 t')
         plt.xscale('log')
         plt.yscale('log')
         plt.legend()
