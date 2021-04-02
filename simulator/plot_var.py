@@ -17,7 +17,7 @@ for i,b in enumerate(B):
     index = 221 + i
     plt.subplot(index)
     for a in A:
-        rel_path = f'KD_var_results/var_a_{a}_b_{b}_type_B1.txt'
+        rel_path = f'var_results/var_a_{a}_b_{b}_type_B1.txt'
         abs_file_path = os.path.join(script_dir, rel_path)
         data = np.loadtxt(abs_file_path)
         V = data[0]

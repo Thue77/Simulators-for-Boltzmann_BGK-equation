@@ -594,11 +594,16 @@ if __name__ == '__main__':
         N=100_000
         M_t = 2
         dt_list = 2.5/M_t**np.arange(0,17,1)
-        # V,E,V_d,E_d=APML_cor_test_fig_5(N)
-        # np.savetxt(f'var_eps_{epsilon}_type_{type}.txt',np.vstack((V,V_d)))
-        # np.savetxt(f'E_eps_{epsilon}_type_{type}.txt',np.vstack((E,E_d)))
-        V,V_d = np.loadtxt(f'var_eps_{epsilon}_type_{type}.txt')
-        E,E_d = np.loadtxt(f'E_eps_{epsilon}_type_{type}.txt')
+        V,E,V_d,E_d=APML_cor_test_fig_5(N)
+        '''Alternatively, run with loaded data from var_results directory by
+        commenting the above line and uncommenting the below'''
+        # script_dir = os.path.dirname(__file__)
+        # rel_path = f'var_results/var_eps_{epsilon}_type_{type}.txt'
+        # abs_file_path = os.path.join(script_dir, rel_path)
+        # V,V_d = np.loadtxt(f'var_eps_{epsilon}_type_{type}.txt')
+        # rel_path = f'var_results/E_eps_{epsilon}_type_{type}.txt'
+        # abs_file_path = os.path.join(script_dir, rel_path)
+        # E,E_d = np.loadtxt(f'E_eps_{epsilon}_type_{type}.txt')
         plt.figure(1)
         plt.subplot(122)
         x2 = dt_list[10]; x1 = dt_list[13]
