@@ -8,7 +8,7 @@ from splitting.mc import mc as APSMC
 from splitting.one_step import phi_SS
 from splitting.correlated import correlated as AP_C
 from splitting.correlated import correlated_test as AP_C_test
-from accept_reject import test1
+from accept_reject import test1,test2
 from space import Omega
 from AddPaths import Sfunc,delta,x_hat
 import seaborn as sns
@@ -80,28 +80,39 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     return x,v,v_norm
 
 #sets the collision rate
-def R(x):
+def R(x,alpha=0,beta=1):
     if type == 'default':
         return 1/(epsilon**2)
     elif type == 'B1':
         return -b*(a*(x-1)-1)*(x<=1) + b*(a*(x-1)+1)*np.logical_not(x<=1)
+    elif type=='A':
+        return 1/epsilon**2*(alpha*x+beta)
 
-def dR(x):
+def dR(x,alpha=0,beta=1):
     if type == 'default':
         return 0
     elif type == 'B1':
         return (x<=1)*(-b*a) + (x>1)*(b*a)
+    elif type=='A':
+        if alpha==0:
+            return 0
+        else:
+            return alpha/epsilon**2
 
 #Anti derivative of R
-def R_anti(x):
+def R_anti(x,alpha=0,beta=1):
     if type == 'default':
         return x/(epsilon**2)
     elif type == 'B1':
         return (-b*a/2*x**2 + (a+1)*b*x)*(x<=1) + (b*a/2*x**2+(1-a)*b*x)*(x>1)
+    elif type=='A':
+        return 1/epsilon**2*(alpha/2*x**2+beta*x)
+
+
 
 #Sample Collision
 # @njit(nogil=True,parallel = True)
-def SC(x,v,e):
+def SC(x,v,e,alpha=0,beta=1):
     if type == 'default' or a==0:
         dtau = 1/R(x)*e
     elif (type == 'B1' or type == 'B2') and a!=0:
@@ -151,6 +162,11 @@ def SC(x,v,e):
             e_local[index_new] = e_local[index_new]-I[index_new_domain]/np.abs(v[index_new])
             '''Update x to equal the value of the boundary that it is crossing'''
             x_new[index_new] = boundaries[bins[index_new] + (direction[index_new]<0)]
+    elif type=='A':
+        if alpha==0:
+            dtau = 1/R(x)*e
+        else:
+            dtau = (-alpha*x-beta + np.sqrt((alpha*x+beta)**2+2*alpha*v*epsilon**2*e))/(alpha*v)
     return dtau
 
 @njit(nogil=True,parallel = True)
@@ -179,14 +195,14 @@ def integral_to_boundary(x,bins,direction,slopes,intercepts):
 def mu(x):
     if test == 'figure 4' or test=='APS':
         return 0
-    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML' or 'num_exp':
         return 0
     elif test == 'num_exp_hom':
         return 0#1/(2*epsilon)
 
 
 def sigma(x):
-    if test == 'figure 4' or test=='APS':
+    if test == 'figure 4' or test=='APS' or 'num_exp':
         return 1/epsilon
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 1
@@ -316,7 +332,6 @@ def KDML_cor_test_fig_5(N):
         for r in prange(runs):
             x0,v0,v_l1_next = Q(n)
             for i in prange(len(dt_list)-1):
-                # print(dt_list[i])
                 x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR)
                 E_bias[r,i] = np.mean(x_f-x_c)
                 V_d[r,i] = np.sum((x_f-x_c-E_bias[r,i])**2)
@@ -328,7 +343,6 @@ def KDML_cor_test_fig_5(N):
         V_out,_ = add_sum_of_squares_alongaxis(V,E,cache)
         V_d_out,_ = add_sum_of_squares_alongaxis(V_d,E_bias,cache)
         return V_out/(N-1),V_d_out/(N-1)
-        # return add_sum_of_squares_alongaxis(V,E,cache)/(N-1),add_sum_of_squares_alongaxis(V_d,E_bias,cache)/(N-1)
     else:
         x0,v0,v_l1_next = Q(N)
         for i in prange(len(dt_list)-1):
@@ -474,6 +488,14 @@ def Kinetic_test():
     N=N_global
     x = Kinetic(N,Q,0,1,mu,sigma,M,R,SC)
     print(f'Kinetic result: {np.mean(x)}')
+
+
+def numerical_experiemnt():
+    '''test=num_exp,type=A'''
+    alpha = input('Give alpha: ')
+    beta = input('Give beta: ')
+    R = lambda x: 1/epsilon**2*(alpha*x+beta)
+    KDMC(dt,x0,v0,e,tau,0,T,mu,sigma,M,R,SC)
 
 
 
