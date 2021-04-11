@@ -8,16 +8,16 @@ import pandas as pd
 from numba import njit
 import sys
 '''Solve kinetic equation deterministically using central difference'''
-eps = 0.01#0.05
+eps = 1#0.05
 #Step sizes
 dx = 0.1#input('step size for x: ')
 p = 10#input('step size for v: ')
 dv = 1/p
-I_t = (0,2.5)
+I_t = (0,0.5)
 dt = 0.01
 
 #Domain
-start = (0,-1) #coordinate of lower left corner in descrete domain
+start = (-1,-1) #coordinate of lower left corner in descrete domain
 end = (1,1)
 
 #Axis
@@ -36,7 +36,7 @@ def initialise_kinetic():
     for i,x in enumerate(x_axis):
         for j,v in enumerate(v_axis):
             in_d = (x<=(0.5+err) and x>=-(0.5+err))*(v>=-(0.75+err) and v<=(0.25+err))
-            f[i,j] = dx*dv*in_d + 0.5*dx*dv*(not in_d)
+            f[i,j] = 2*dx*dv*in_d + dx*dv*(not in_d)
     return f
 
 '''Instead of advection matrix'''
@@ -46,6 +46,12 @@ def Advection_CD():
     ileft = np.append(np.array([N_x-1]),np.arange(0,N_x-1))
     iright = np.append(np.arange(1,N_x),np.array([0]))
     return ileft,iright
+
+def equilibrium(f):
+    n,m = f.shape
+    rho = np.sum(f,axis=0)
+
+
 
 '''Use Backward for transport step and forward Euler for collision step
  to solve f_t + v/eps*f_x = 1/eps**2(M*rho-f)'''
@@ -61,7 +67,7 @@ def kinetic_FE():
     # A_inv = np.linalg.inv(np.identity((N_x+1)*(N_v+1))+dt*block_multiply(A,v)/eps)
     for i in range(steps):
         f = f - dt/eps*(v*(f[ileft,:]-f[iright,:]))/(2*dx)#np.matmul(A_inv,f) #Transport step
-        f = f+ dt/eps**2*(np.sum(f,axis=1)-f)#(equilibrium(f,N_x,N_v)-f) #Collision step
+        f = f+ dt/eps**2*(0.5*np.sum(f,axis=0)-f)#(equilibrium(f,N_x,N_v)-f) #Collision step
     rho = np.sum(f,axis=1)
     plt.plot(x_axis,rho)
     plt.show()
@@ -181,8 +187,8 @@ def heat_MC():
 if __name__ == '__main__':
     # diffusive_FE()
     # heat_altered()
-    # kinetic_FE()
-    X = heat_MC()
-    dist = pd.DataFrame(data={'x':X})
-    sns.kdeplot(data=dist, x="x",cut=0)
-    plt.show()
+    kinetic_FE()
+    # X = heat_MC()
+    # dist = pd.DataFrame(data={'x':X})
+    # sns.kdeplot(data=dist, x="x",cut=0)
+    # plt.show()
