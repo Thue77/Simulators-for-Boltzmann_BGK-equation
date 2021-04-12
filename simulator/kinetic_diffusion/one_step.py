@@ -20,7 +20,7 @@ def dDdR(x,v,e,theta,mu,sigma,R):
     return D1+D2
 
 #The KD-operator. Moves the particle(s) according to the kinetic-diffusion algorithm by a distance of dt
-def __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=None):
+def __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=None,boundary=None):
     '''
     dt: the time step
     v0: initial velocity for kinetc part of the step
@@ -33,6 +33,7 @@ def __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=None):
     # dt = np.ones(n)*dt
     # theta = dt - np.mod(tau,dt)
     x_pp = xp if dR is None else xp + mu(xp)*theta/2 #Intermediate point to deal with heterogenity
+    if boundary is not None: x_pp = boundary(x_pp)
     v = v_next.copy() #Velocity of kinetic phase in next step. Drawn at the position of the collision
     e = np.exp(-R(x_pp)*theta)
     dDdR_dRdx = np.zeros(n) if dR is None else dDdR(x_pp,v,e,theta,mu,sigma,R)*dR(x_pp)
@@ -56,9 +57,12 @@ def phi_KD(dt,x0,v0,t,tau,z,mu,sigma,M,R,v_rv=None,dR=None,boundary=None):
     M: post-collisional distribution
     R: collision rate
     '''
+    print(f'before kinetic, min(x): {np.min(x0)}')
     xp,t = __psi_k(tau,x0,v0,t)
-    if boundary is not None: xp = boundary(xp)
+    if boundary is not None:
+        xp = boundary(xp)
     theta = dt - np.mod(tau,dt)
+    print(f'after kinetic, min(x): {np.min(xp)}, using boundary(x): {np.min(boundary(xp))}')
     '''When correlating paths the r.v. for the next step is given in the Coarse
         step by using the ones from the fine step. In that case v_rv is given'''
     if v_rv is None:
@@ -70,10 +74,12 @@ def phi_KD(dt,x0,v0,t,tau,z,mu,sigma,M,R,v_rv=None,dR=None,boundary=None):
     # v_norm = M(xp) if v_rv is None else v_rv
     # v_next = mu(xp)+sigma(xp)* v_norm
     x,v,t = __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=dR)
-    if boundary is not None: x = boundary(x)
+    if boundary is not None:
+        x = boundary(x)
+    print(f'after diffusive, min(x): {np.min(x)}')
     return x,v,t,v_norm
 
-jit_module(nopython=True,nogil=True, parallel = True)
+# jit_module(nopython=True,nogil=True, parallel = True)
 
 #For testing purposes
 if __name__ == '__main__':

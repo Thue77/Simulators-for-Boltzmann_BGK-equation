@@ -51,12 +51,12 @@ Nested =False,dR=None,boundary=None):
         # if n==0:
         #     break
         xi = np.random.normal(0,1,size=np.sum(I))
-        x[I],v[I],t[I],_ = phi_KD(dt,x[I],v[I],t[I],tau[I],xi,mu,sigma,M,R,dR=dR)
+        x[I],v[I],t[I],_ = phi_KD(dt,x[I],v[I],t[I],tau[I],xi,mu,sigma,M,R,dR=dR,boundary=boundary)
         #Update first collision time for next step
-        e = np.random.exponential(1,size=np.sum(I))
-        tau[I] = SC(x[I],v[I],e)
+        # e = np.random.exponential(1,size=np.sum(I))
+        # tau[I] = SC(x[I],v[I],e)
         # t[index] = t_temp; x[index] = x_temp; v[index] = v_temp
-        I = (t+tau)<T
+        # I = (t+tau)<T
         # index = np.argwhere(I).flatten()
         count += 1
     I = t<T

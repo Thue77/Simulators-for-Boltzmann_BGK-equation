@@ -221,6 +221,9 @@ def M(x):
         # v_next = (1-v_norm*2)/epsilon
         v_next = np.random.uniform(-1,1,size=len(x))/epsilon
         v_norm = v_next/sigma(x)
+    elif type == 'A':
+        v_norm = np.random.normal(0,1,size=x.size)
+        v_next = v_norm/epsilon
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = mu(x) + sigma(x)*v_norm
@@ -237,24 +240,28 @@ def M_nu(x):
         U = np.random.uniform(0,1,size=len(x))
         v_next =  (U <= 0.5).astype(np.float64) - (U > 0.5).astype(np.float64)
         v_norm = v_next.copy()
+    elif type == 'A':
+        v_norm = np.random.normal(0,1,size=x.size)
+        v_next = v_norm.copy()
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = mu(x) + sigma(x)*v_norm
     return v_next,v_norm
 
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def boundary_periodic(x):
     x0 = 0; xL = 1#/epsilon
     l = xL-x0 #Length of x domain
     I_low = (x<x0); I_high = (x>xL);
-    x[I_low] = x[I_low] + l#xL-((x0-x[I_low])%l)
-    x[I_high] = x[I_high] - l#x0 + ((x[I_high]-xL)%l)
-    return x
-
+    x_new = x.copy()
+    x_new[I_low] = xL-((x0-x[I_low])%l)#x_new[I_low] + l
+    x_new[I_high] = x0 + ((x[I_high]-xL)%l)#x_new[I_high] - l
+    return x_new
 
 
 jit_module(nopython=True,nogil=True)
+
 
 '''Tests'''
 
@@ -296,7 +303,7 @@ def KDMC_test_fig_4(N):
     tau = SC(x0,v0,e)
     # print(f'tau > T: {np.where(tau>T)}')
     start = time.time()
-    x = KDMC(dt,x0,v0,e,tau,0,T,mu,sigma,M,R,SC)
+    x = KDMC(dt,x0,v0,t,T,mu,sigma,M,R,SC)
     print(f'Before compile: {time.time()-start}')
     start = time.time()
     x = KDMC(dt,x0,v0,e,tau,0,T,mu,sigma,M,R,SC)
@@ -362,10 +369,7 @@ def KDML_cor_test_fig_5(N):
 @njit(nogil=True,parallel=True)
 def APML_cor_test_fig_5(N):
     '''
-    epsilon is irrelevant
-    type = 'B1' or 'B2'
-    test = 'figure 5'
-    set a and b as desired
+    Test for variance in Figres 6, 7 and 8 in multilevel article by Løvbak.
     '''
     M_t = 2; t=0;T=5
     cache = 10_000
@@ -495,12 +499,27 @@ def Kinetic_test():
     print(f'Kinetic result: {np.mean(x)}')
 
 
-def numerical_experiemnt():
-    '''test=num_exp,type=A'''
-    alpha = input('Give alpha: ')
-    beta = input('Give beta: ')
-    R = lambda x: 1/epsilon**2*(alpha*x+beta)
-    KDMC(dt,x0,v0,e,tau,0,T,mu,sigma,M,R,SC)
+def numerical_experiemnt_mc():
+    '''
+    numerical experiemnt that does not start in equilibrium but starts with
+    f(x,v,t=0)= 1/sqrt(2*pi)*v^2*e^{-v^2/2}*(1+cos(2*pi*(x+1/2)))
+
+    test=num_exp,type=A'''
+    alpha = float(input('Give alpha: '))
+    beta = float(input('Give beta: '))
+    N = int(input('Give number of paths: '))
+    # R = lambda x: 1/epsilon**2*(alpha*x+beta)
+    x0,v0,_ = Q(N)
+    dt = 0.01;t0 = 0;T = 1
+    x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary_periodic)
+    print(np.min(x))
+    dist = pd.DataFrame(data={'x':x})
+    sns.kdeplot(data=dist, x="x",cut=0,common_norm=False)
+    x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
+    print(np.min(x))
+    dist = pd.DataFrame(data={'x':x})
+    sns.kdeplot(data=dist, x="x",cut=0,common_norm=False)
+
 
 
 
@@ -670,6 +689,10 @@ if __name__ == '__main__':
         plt.yscale('log')
         # plt.legend()
         plt.show()
+    elif test == 'num_exp' and type == 'A':
+        numerical_experiemnt_mc()
+        plt.show()
+    # print(boundary_periodic(np.array([0.1,-0.5,-1.6,0.9,1.3,4.5])))
 
 
 

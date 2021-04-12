@@ -83,6 +83,7 @@ def plot_test(data_sample=None):
     ax.set_title('Surface plot of estimated f(x,v,t=0)')
     surf = ax.plot_surface(X, Y, f, rstride=1, cstride=1, edgecolor='none')
 
+@njit(nogil=True)
 def test2(N=10_000):
     '''Accept-reject method for f(x,v,t=0)= 1/sqrt(2*pi)*v^2*e^{-v^2/2}*(1+cos(2*pi*(x+1/2)))'''
     c = 2.9
@@ -107,7 +108,7 @@ def test2(N=10_000):
     while n>0:
         x,v = rq(n)
         #Uniform number to test whether to accept or reject
-        U = np.random.uniform(size=n)
+        U = np.random.uniform(0,1,size=n)
         #Test if reject or accept
         I_n = U <= f(x,v)/(c*q(x,v))
         index_accept = np.where(I)[0][I_n]
