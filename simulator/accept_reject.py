@@ -114,7 +114,7 @@ def test2(N=10_000):
         X[index_accept] = x[I_n];V[index_accept] = v[I_n]
         I[index_accept] = 0
         n = np.sum(I,dtype=np.int64)
-    return X,V
+    return X,V,V/np.sqrt(3)
 
 def plot_exact():
     x_axis = np.arange(0,1,1e-2)
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     # sns.kdeplot(data=dist, x="x",hue='q(x)',linestyle='dashed')
     # plt.plot(np.arange(0,1,0.001),rho(np.arange(0,1,0.001)),label='p(x)')
     # plt.legend(labels=['Estimated p(x)','p(x)'])
-    X,V = test2(500_000)
+    X,V,_ = test2(500_000)
     plot_test(np.vstack((X,V)))
     # plot_exact()
 

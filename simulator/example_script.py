@@ -65,6 +65,9 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
         # v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
         v_norm = v/sigma(x)
+    elif test == 'num_exp':
+        x,v,v_norm = test2(N)
+        v = v/epsilon;v_norm=v_norm/epsilon
     return x,v,v_norm
 
 def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
@@ -77,6 +80,8 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v =  (U <= 0.5).astype(np.float64) - (U > 0.5).astype(np.float64)
         x = np.zeros(N)
         v_norm = v.copy()
+    elif test == 'num_exp':
+        x,v,v_norm = test2(N)
     return x,v,v_norm
 
 #sets the collision rate

@@ -29,6 +29,8 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
         x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c)
         t += dt_c
     return x_f,x_c
+
+'''Function to make different plot tests for homogenous version of correlated method'''
 def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
@@ -92,6 +94,37 @@ def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
         plt.legend(title='Type of path')
         plt.show()
     return x_f,x_c
+
+
+
+@njit(nogil=True)
+'''Heterogeneous version where r = r(x)'''
+def correlated_non_hom(dt_f,M_t,t,T,eps,N,Q,B,r,plot=False,plot_var=False):
+    '''
+    M_t: defined s.t. dt_c=M_t dt_f
+    t: starting time
+    eps: diffusive parameter
+    N: number of paths
+    Q: Initial distribution
+    M: velocity distribution
+    '''
+    dt_c = dt_f*M_t
+    x_f,_,v_f = Q(N)
+    x_c = x_f.copy()
+    v_bar_c = v_f.copy()
+    v_c = v_f.copy()
+    while t<T:
+        Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
+        C = (U>=eps**2/(eps**2+dt_f*r)) #Indicates if collisions happen
+        for m in range(M_t):
+            x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r(x_f))
+            v_bar_c[C[:,m]] = v_f[C[:,m]]
+        z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
+        u_c = max_np(U,axis=1)**M_t
+        x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r(x_c),v_next=v_bar_c)
+        t += dt_c
+    return x_f,x_c
+
 
 @njit(nogil=True)
 def max_np(A,axis=1):
