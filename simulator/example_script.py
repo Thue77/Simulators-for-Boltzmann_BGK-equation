@@ -4,7 +4,7 @@ from kinetic_diffusion.correlated import correlated as KD_C
 from kinetic_diffusion.correlated import set_last_nonzero_col
 from kinetic_diffusion.ml import warm_up,select_levels,select_levels_data
 from kinetic_diffusion.ml import ml as KDML
-from splitting.mc import mc as APSMC
+from splitting.mc import mc as APSMC,mc_standard
 from splitting.one_step import phi_SS
 from splitting.correlated import correlated as AP_C
 from splitting.correlated import correlated_test as AP_C_test
@@ -67,7 +67,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v_norm = v/sigma(x)
     elif test == 'num_exp':
         x,v,v_norm = test2(N)
-        v = v/epsilon;v_norm=v_norm/epsilon
+        v = v/epsilon
     return x,v,v_norm
 
 def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
@@ -207,8 +207,8 @@ def mu(x):
 
 
 def sigma(x):
-    if test == 'figure 4' or test=='APS' or 'num_exp':
-        return 1/epsilon
+    if test == 'figure 4' or test=='APS' or test== 'num_exp':
+        return 1/epsilon#*np.sqrt(3)
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 1
     elif test == 'num_exp_hom':
@@ -249,7 +249,8 @@ def M_nu(x):
     return v_next,v_norm
 
 
-# @njit(nogil=True)
+
+@njit(nogil=True)
 def boundary_periodic(x):
     x0 = 0; xL = 1#/epsilon
     l = xL-x0 #Length of x domain
@@ -510,15 +511,19 @@ def numerical_experiemnt_mc():
     N = int(input('Give number of paths: '))
     # R = lambda x: 1/epsilon**2*(alpha*x+beta)
     x0,v0,_ = Q(N)
-    dt = 0.01;t0 = 0;T = 1
+    dt = 0.001;t0 = 0;T = 0.1
     x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary_periodic)
-    print(np.min(x))
-    dist = pd.DataFrame(data={'x':x})
-    sns.kdeplot(data=dist, x="x",cut=0,common_norm=False)
+    print(np.mean(x))
+    dist = pd.DataFrame(data={'x':x,'Method':['KD' for _ in range(len(x))]})
+    # sns.kdeplot(data=dist, x="x",hue='method',linestyle='--',cut=0,common_norm=False)
     x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
-    print(np.min(x))
-    dist = pd.DataFrame(data={'x':x})
-    sns.kdeplot(data=dist, x="x",cut=0,common_norm=False)
+    print(np.mean(x))
+    dist = dist.append(pd.DataFrame(data={'x':x,'Method':['APS' for _ in range(len(x))]}))
+    x = Kinetic(N,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
+    dist = dist.append(pd.DataFrame(data={'x':x,'Method':['Kinetic' for _ in range(len(x))]}))
+    x = mc_standard(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_periodic)
+    dist = dist.append(pd.DataFrame(data={'x':x,'Method':['SS' for _ in range(len(x))]}))
+    sns.kdeplot(data=dist, x="x",hue='Method',linestyle='dotted',cut=0,common_norm=False)
 
 
 
@@ -593,33 +598,20 @@ if __name__ == '__main__':
         N = 400_000
         dt = 0.005;t0=0;T=0.1
         # test_num_exp_hom_MC()
-        if False:
-            x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
-            # np.savetxt(f'APS_eps_{epsilon}.txt',x)
-        elif True:
-            x0,v0,_ = Q(N)
-            # e = np.random.exponential(size=N); tau = SC(x0,v0,e)
-            x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
-            np.savetxt(f'KDMC_eps_{epsilon}.txt',x)
-        elif False:
-            t = t0
-            # dt = min(epsilon**2/2,dt)
-            print(dt)
-            x,_,_ = Q(N)
-            v = epsilon/(epsilon**2+dt)*np.random.uniform(-1,1,size=len(x))
-            # dist = pd.DataFrame(data={'x':x})
-            # sns.kdeplot(data=dist, x="x",cut=0,label='Initial')
-            while t<T:
-                x,v = phi_SS(x,v,dt,epsilon)
-                x = boundary_periodic(x)
-                t += dt
-        else:
-            x = Kinetic(N,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
+        # x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
+        x0,v0,_ = Q(N)
+        x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
+        dist = pd.DataFrame(data={'x':x,'Method':['APS' for _ in range(N)]})
+        # dist = dist.append(pd.DataFrame(data={'x':x,'Method':['KD' for _ in range(N)]}))
+        # x = mc_standard(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_periodic)
+        # dist = dist.append(pd.DataFrame(data={'x':x,'Method':['SS' for _ in range(N)]}))
+        # x = Kinetic(N,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
+        # dist = dist.append(pd.DataFrame(data={'x':x,'Method':['Kinetic' for _ in range(N)]}))
         # print(x)
         # rho = SP.density_estimation(x)
         # x=x*epsilon
-        dist = pd.DataFrame(data={'x':x})
-        sns.kdeplot(data=dist, x="x",cut=0)
+        # dist = pd.DataFrame(data={'x':x})
+        sns.kdeplot(data=dist, x="x",hue='Method',cut=0,common_norm=False)
         # plt.plot(SP.x_axis,rho)
         plt.show()
     elif test == 'corr_path' and type=='Goldstein-Taylor':
@@ -690,10 +682,7 @@ if __name__ == '__main__':
         # plt.legend()
         plt.show()
     elif test == 'num_exp' and type == 'A':
+        '''Numerical with f(x,v,t=0)= 1/sqrt(2*pi)*v^2*e^{-v^2/2}*(1+cos(2*pi*(x+1/2)))
+        and in the equilibrium state V ~ N(0,1)'''
         numerical_experiemnt_mc()
         plt.show()
-    # print(boundary_periodic(np.array([0.1,-0.5,-1.6,0.9,1.3,4.5])))
-
-
-
-    # print(test_numba(np.array([1,-2,3,4,-5],dtype=np.float64)))

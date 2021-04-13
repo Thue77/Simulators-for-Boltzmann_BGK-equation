@@ -57,12 +57,10 @@ def phi_KD(dt,x0,v0,t,tau,z,mu,sigma,M,R,v_rv=None,dR=None,boundary=None):
     M: post-collisional distribution
     R: collision rate
     '''
-    print(f'before kinetic, min(x): {np.min(x0)}')
     xp,t = __psi_k(tau,x0,v0,t)
     if boundary is not None:
         xp = boundary(xp)
     theta = dt - np.mod(tau,dt)
-    print(f'after kinetic, min(x): {np.min(xp)}, using boundary(x): {np.min(boundary(xp))}')
     '''When correlating paths the r.v. for the next step is given in the Coarse
         step by using the ones from the fine step. In that case v_rv is given'''
     if v_rv is None:
@@ -70,16 +68,12 @@ def phi_KD(dt,x0,v0,t,tau,z,mu,sigma,M,R,v_rv=None,dR=None,boundary=None):
     else:
         v_norm = v_rv
         v_next = mu(xp)+sigma(xp)* v_norm
-
-    # v_norm = M(xp) if v_rv is None else v_rv
-    # v_next = mu(xp)+sigma(xp)* v_norm
-    x,v,t = __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=dR)
+    x,v,t = __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=dR,boundary=boundary)
     if boundary is not None:
         x = boundary(x)
-    print(f'after diffusive, min(x): {np.min(x)}')
     return x,v,t,v_norm
 
-# jit_module(nopython=True,nogil=True, parallel = True)
+jit_module(nopython=True,nogil=True)
 
 #For testing purposes
 if __name__ == '__main__':

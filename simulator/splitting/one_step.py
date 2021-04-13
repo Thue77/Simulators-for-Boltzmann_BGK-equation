@@ -45,7 +45,22 @@ def phi_APS(x,v,dt,eps,z,u,B,r=1,v_next=None,boundary=None):
         x = boundary(x)
     v,v_bar = psi_c(x,v,dt,eps,u,B,r,v_next)
     return x,v,v_bar
+
+
+def phi_standard(x,v,dt,eps,M,boundary):
+    #transport step
+    x = boundary(x+1/eps*v*dt)
+    #collision step
+    u = np.random.uniform(0,1,size=len(x))
+    p = u<=dt/eps**2
+    _,v_bar = M(x)
+    v = (1-p)*v + p*v_bar/eps
+    return x,v
+
+
 jit_module(nopython=True,nogil=True)
+
+
 
 def phi_SS(x,v,dt,eps):
     # x = v/eps*dt
