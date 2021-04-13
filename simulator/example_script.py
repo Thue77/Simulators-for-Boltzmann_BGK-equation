@@ -93,6 +93,12 @@ def R(x,alpha=0,beta=1):
     elif type=='A':
         return 1/epsilon**2*(alpha*x+beta)
 
+def r(x,alpha=0,beta=1):
+    if type == 'A':
+        return alpha*x+beta
+    elif type=='default':
+        return 1
+
 def dR(x,alpha=0,beta=1):
     if type == 'default':
         return 0
@@ -256,10 +262,12 @@ def boundary_periodic(x):
     l = xL-x0 #Length of x domain
     I_low = (x<x0); I_high = (x>xL);
     x_new = x.copy()
-    x_new[I_low] = xL-((x0-x[I_low])%l)#x_new[I_low] + l
-    x_new[I_high] = x0 + ((x[I_high]-xL)%l)#x_new[I_high] - l
+    x_new[I_low] = x_new[I_low] + l#xL-((x0-x[I_low])%l)#
+    x_new[I_high] = x_new[I_high] - l#x0 + ((x[I_high]-xL)%l)#
     return x_new
 
+def boundary_test(x):
+    return x
 
 jit_module(nopython=True,nogil=True)
 
@@ -506,8 +514,8 @@ def numerical_experiemnt_mc():
     f(x,v,t=0)= 1/sqrt(2*pi)*v^2*e^{-v^2/2}*(1+cos(2*pi*(x+1/2)))
 
     test=num_exp,type=A'''
-    alpha = float(input('Give alpha: '))
-    beta = float(input('Give beta: '))
+    # alpha = float(input('Give alpha: '))
+    # beta = float(input('Give beta: '))
     N = int(input('Give number of paths: '))
     # R = lambda x: 1/epsilon**2*(alpha*x+beta)
     x0,v0,_ = Q(N)
@@ -596,23 +604,18 @@ if __name__ == '__main__':
         rho(x,0) = 1+cos(2*pi*(x+0.5)) and V ~ U(-1,1)'''
         x_lim = (0,1); v_lim = (-1,1)
         N = 400_000
-        dt = 0.005;t0=0;T=0.1
+        dt = 0.0001;t0=0;T=0.1
         # test_num_exp_hom_MC()
-        # x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
-        x0,v0,_ = Q(N)
-        x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
+        x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_test)
         dist = pd.DataFrame(data={'x':x,'Method':['APS' for _ in range(N)]})
-        # dist = dist.append(pd.DataFrame(data={'x':x,'Method':['KD' for _ in range(N)]}))
-        # x = mc_standard(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_periodic)
-        # dist = dist.append(pd.DataFrame(data={'x':x,'Method':['SS' for _ in range(N)]}))
-        # x = Kinetic(N,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
-        # dist = dist.append(pd.DataFrame(data={'x':x,'Method':['Kinetic' for _ in range(N)]}))
-        # print(x)
-        # rho = SP.density_estimation(x)
-        # x=x*epsilon
-        # dist = pd.DataFrame(data={'x':x})
+        x0,v0,_ = Q(N)
+        x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_test)
+        dist = dist.append(pd.DataFrame(data={'x':x,'Method':['KD' for _ in range(N)]}))
+        x = mc_standard(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_test,r)
+        dist = dist.append(pd.DataFrame(data={'x':x,'Method':['SS' for _ in range(N)]}))
+        x = Kinetic(N,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary_test)
+        dist = dist.append(pd.DataFrame(data={'x':x,'Method':['Kinetic' for _ in range(N)]}))
         sns.kdeplot(data=dist, x="x",hue='Method',cut=0,common_norm=False)
-        # plt.plot(SP.x_axis,rho)
         plt.show()
     elif test == 'corr_path' and type=='Goldstein-Taylor':
         '''Plot the fine and coarse path of the APML method under the Goldstein-

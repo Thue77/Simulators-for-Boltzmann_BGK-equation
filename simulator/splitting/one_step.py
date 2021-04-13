@@ -47,14 +47,14 @@ def phi_APS(x,v,dt,eps,z,u,B,r=1,v_next=None,boundary=None):
     return x,v,v_bar
 
 
-def phi_standard(x,v,dt,eps,M,boundary):
+def phi_standard(x,v,dt,eps,M,r,boundary):
     #transport step
-    x = boundary(x+1/eps*v*dt)
+    x = boundary(x+v/eps*dt)
     #collision step
     u = np.random.uniform(0,1,size=len(x))
-    p = u<=dt/eps**2
+    p = u>np.exp(-r(x)/eps**2*dt)
     _,v_bar = M(x)
-    v = (1-p)*v + p*v_bar/eps
+    v = (1-p)*v + p*v_bar
     return x,v
 
 
