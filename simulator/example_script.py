@@ -266,8 +266,13 @@ def boundary_periodic(x):
     x_new[I_high] = x_new[I_high] - l#x0 + ((x[I_high]-xL)%l)#
     return x_new
 
-def boundary_test(x):
-    return x
+'''Function related to the quantity of interest, E(F(X,V))'''
+def F(x,v):
+    if test=='APML':
+        return x**2
+    else:
+        return x
+
 
 jit_module(nopython=True,nogil=True)
 
@@ -689,3 +694,4 @@ if __name__ == '__main__':
         and in the equilibrium state V ~ N(0,1)'''
         numerical_experiemnt_mc()
         plt.show()
+    elif: test=='APML' and type=='Goldstein-Taylor':
