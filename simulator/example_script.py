@@ -8,6 +8,7 @@ from splitting.mc import mc as APSMC,mc_standard
 from splitting.one_step import phi_SS
 from splitting.correlated import correlated as AP_C
 from splitting.correlated import correlated_test as AP_C_test
+from splitting.ml import ml as APML
 from accept_reject import test1,test2,test3
 from space import Omega
 from AddPaths import Sfunc,delta,x_hat
@@ -96,7 +97,7 @@ def R(x,alpha=0,beta=1):
 def r(x,alpha=0,beta=1):
     if type == 'A':
         return alpha*x+beta
-    elif type=='default':
+    elif type=='default' or test == 'APML':
         return 1
 
 def dR(x,alpha=0,beta=1):
@@ -256,7 +257,6 @@ def M_nu(x):
 
 
 
-@njit(nogil=True)
 def boundary_periodic(x):
     x0 = 0; xL = 1#/epsilon
     l = xL-x0 #Length of x domain
@@ -267,14 +267,14 @@ def boundary_periodic(x):
     return x_new
 
 '''Function related to the quantity of interest, E(F(X,V))'''
-def F(x,v):
+def F(x,v=0):
     if test=='APML':
         return x**2
     else:
         return x
 
 
-jit_module(nopython=True,nogil=True)
+# jit_module(nopython=True,nogil=True)
 
 
 '''Tests'''
@@ -694,4 +694,14 @@ if __name__ == '__main__':
         and in the equilibrium state V ~ N(0,1)'''
         numerical_experiemnt_mc()
         plt.show()
-    elif: test=='APML' and type=='Goldstein-Taylor':
+    elif test=='APML' and type=='Goldstein-Taylor':
+        '''To compare with tables 1, 2 and 3 in article by Løvbak
+        epsilon=0.1.
+        e2=0.1^2, N=40
+        e2=0.01^2, N=500
+        e2=0.001^2, N=1000
+        '''
+        M_t = 2; t0=0;T=0.5
+        e2 = 0.1**2;N=40
+        E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N)
+        print(f'E: {E} \n V: {V} \n C: {C} \n levels: {levels}')

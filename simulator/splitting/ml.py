@@ -2,9 +2,11 @@ import numpy as np
 from .correlated import correlated
 from .mc import mc
 from .AddPaths import delta,x_hat,Sfunc
+import time
+from numba import njit,jit_module,prange,objmode
 
 
-def select_levels(t0,T,M_t,F,strategy=1,cold_start=True,N=100,boundary=None):
+def select_levels(t0,T,M_t,eps,F,strategy=1,cold_start=True,N=100,boundary=None):
     '''
     strategy: indicates if strategy 1 or 2 is used
     cold_start: indicates if the variance and estimates are calculated for an
@@ -14,20 +16,20 @@ def select_levels(t0,T,M_t,F,strategy=1,cold_start=True,N=100,boundary=None):
     if strategy==1:
         levels += [eps**2]
         levels += [eps**2/M_t]
-        N_out=np.ones(2)*N
-        N_diff=np.ones(2)*N
-        SS_out = np.zeros(2);C_out = np.zeros(2);
-    elif strategy==2:
+        N_out=np.zeros(2,dtype=np.int64)
+        N_diff=np.ones(2,dtype=np.int64)*N
+        SS_out = np.zeros(2);C_out = np.zeros(2); E_out=np.zeros(2)
+    else:
         levels += [T-t0]
         levels += [eps**2]
         levels += [eps**2/M_t]
-        N_out=np.zeros(3)
-        N_diff=np.ones(3)*N
-        SS_out = np.zeros(3);C_out = np.zeros(3);
+        N_out=np.zeros(3,dtype=np.int64)
+        N_diff=np.ones(3,dtype=np.int64)*N
+        SS_out = np.zeros(3);C_out = np.zeros(3); E_out=np.zeros(3)
     return levels,N_out,N_diff,E_out,SS_out,C_out
 
 
-def ml(e2,Q,t0,T,M_t,eps,M,r,F,boundary=None,strategy=1):
+def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1):
     '''
     e2: bound on mean square error
     Q: initial distribution
@@ -39,7 +41,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,boundary=None,strategy=1):
     r: collision rate
     F: function used to find quantity of interest, E(F(X,V)).
     '''
-    levels,N,N_diff,E,SS,C = select_levels(t0,T,M_t,F)
+    levels,N,N_diff,E,SS,C = select_levels(t0,T,M_t,eps,F,N=N_warm)
     '''
     levels: a list of step sizes for each level
     N: list of number of paths used
@@ -62,7 +64,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,boundary=None,strategy=1):
                 if i!=0:
                     with objmode(start1 = 'f8'):
                         start1 = time.perf_counter()
-                    x_f,x_c = correlated(dt_f,M_t,t,T,eps,N,Q,B,r)
+                    x_f,x_c = correlated(dt_f,M_t,t0,T,eps,N_diff[i],Q,M,r)
                     with objmode(end1 = 'f8'):
                         end1 = time.perf_counter()
                     C_temp = (end1-start1)/N_diff[i]
@@ -71,10 +73,11 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,boundary=None,strategy=1):
                 else:
                     with objmode(start2 = 'f8'):
                         start2 = time.perf_counter()
-                    x = mc(dt_f,t0,T,N,eps,Q,M,r,boundary)
+                    x = mc(dt_f,t0,T,N_diff[i],eps,Q,M,r,boundary)
                     with objmode(end2 = 'f8'):
                         end2 = time.perf_counter()
                     C_temp = (end2-start2)/N_diff[i]
+                    print(F(x))
                     E_temp = np.mean(F(x))
                     SS_temp = np.sum((F(x)-E_temp)**2)
                 Delta = delta(E[i],E_temp,N[i],N_diff[i])

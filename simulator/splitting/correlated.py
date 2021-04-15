@@ -3,8 +3,8 @@ from .one_step import phi_APS
 import matplotlib.pyplot as plt
 from numba import njit,jit_module,prange
 
-@njit(nogil=True)
-def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1):
+# @njit(nogil=True)
+def correlated(dt_f,M_t,t,T,eps,N,Q,B,r):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -20,7 +20,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1):
     v_c = v_f.copy()
     while t<T:
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
-        C = (U>=eps**2/(eps**2+dt_f*r)) #Indicates if collisions happen
+        C = (U>=eps**2/(eps**2+dt_f*r(x_f))) #Indicates if collisions happen
         for m in range(M_t):
             x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r)
             v_bar_c[C[:,m]] = v_f[C[:,m]]
