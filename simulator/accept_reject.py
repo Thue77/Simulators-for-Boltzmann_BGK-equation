@@ -117,10 +117,37 @@ def test2(N=10_000):
         n = np.sum(I,dtype=np.int64)
     return X,V,V/np.sqrt(3)
 
+@njit(nogil=True)
+def test3(N=10_000):
+    '''Accept-reject method for f(x,v,t=0)= 1/sqrt(2*pi)*v^2*e^{-v^2/2}*(1+cos(2*pi*(x+1/2)))'''
+    c = 2
+    q = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)
+    f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*(1+np.cos(2*np.pi*(x+0.5)))
+    #Function to generate random numbers from q
+    def rq(n):
+        x = np.random.uniform(0,1,size=n)
+        v = np.random.normal(0,1,size=n)
+        return x,v
+    I = np.ones(N)
+    n = np.sum(I,dtype=np.int64)
+    X = np.zeros(N); V = np.zeros(N)
+    while n>0:
+        x,v = rq(n)
+        #Uniform number to test whether to accept or reject
+        U = np.random.uniform(0,1,size=n)
+        #Test if reject or accept
+        I_n = U <= f(x,v)/(c*q(x,v))
+        index_accept = np.where(I)[0][I_n]
+        X[index_accept] = x[I_n];V[index_accept] = v[I_n]
+        I[index_accept] = 0
+        n = np.sum(I,dtype=np.int64)
+    return X,V,V
+
 def plot_exact():
     x_axis = np.arange(0,1,1e-2)
     v_axis = np.arange(-4,4,8e-2)
-    f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*v**2*(1+np.cos(2*np.pi*(x+0.5)))
+    # f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*v**2*(1+np.cos(2*np.pi*(x+0.5))) #test2
+    f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*(1+np.cos(2*np.pi*(x+0.5))) # test3
     X, V = np.meshgrid(x_axis,v_axis)
     fig = plt.figure(figsize=(13, 7))
     ax = plt.axes(projection='3d')
@@ -139,9 +166,9 @@ if __name__ == '__main__':
     # sns.kdeplot(data=dist, x="x",hue='q(x)',linestyle='dashed')
     # plt.plot(np.arange(0,1,0.001),rho(np.arange(0,1,0.001)),label='p(x)')
     # plt.legend(labels=['Estimated p(x)','p(x)'])
-    X,V,_ = test2(500_000)
+    X,V,_ = test3(500_000)
     plot_test(np.vstack((X,V)))
-    # plot_exact()
+    plot_exact()
 
 
     plt.show()

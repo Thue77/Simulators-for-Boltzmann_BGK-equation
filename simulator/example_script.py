@@ -8,7 +8,7 @@ from splitting.mc import mc as APSMC,mc_standard
 from splitting.one_step import phi_SS
 from splitting.correlated import correlated as AP_C
 from splitting.correlated import correlated_test as AP_C_test
-from accept_reject import test1,test2
+from accept_reject import test1,test2,test3
 from space import Omega
 from AddPaths import Sfunc,delta,x_hat
 import seaborn as sns
@@ -214,7 +214,7 @@ def mu(x):
 
 def sigma(x):
     if test == 'figure 4' or test=='APS' or test== 'num_exp':
-        return 1/epsilon#*np.sqrt(3)
+        return 1/epsilon
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 1
     elif test == 'num_exp_hom':
@@ -524,14 +524,14 @@ def numerical_experiemnt_mc():
     print(np.mean(x))
     dist = pd.DataFrame(data={'x':x,'Method':['KD' for _ in range(len(x))]})
     # sns.kdeplot(data=dist, x="x",hue='method',linestyle='--',cut=0,common_norm=False)
-    x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
+    x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,r,boundary=boundary_periodic)
     print(np.mean(x))
     dist = dist.append(pd.DataFrame(data={'x':x,'Method':['APS' for _ in range(len(x))]}))
     x = Kinetic(N,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
     dist = dist.append(pd.DataFrame(data={'x':x,'Method':['Kinetic' for _ in range(len(x))]}))
-    x = mc_standard(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_periodic)
+    x = mc_standard(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_periodic,r)
     dist = dist.append(pd.DataFrame(data={'x':x,'Method':['SS' for _ in range(len(x))]}))
-    sns.kdeplot(data=dist, x="x",hue='Method',linestyle='dotted',cut=0,common_norm=False)
+    sns.kdeplot(data=dist, x="x",hue='Method',linestyle='--',cut=0,common_norm=False)
 
 
 
@@ -606,14 +606,14 @@ if __name__ == '__main__':
         N = 400_000
         dt = 0.0001;t0=0;T=0.1
         # test_num_exp_hom_MC()
-        x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_test)
+        x = APSMC(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary=boundary_periodic)
         dist = pd.DataFrame(data={'x':x,'Method':['APS' for _ in range(N)]})
         x0,v0,_ = Q(N)
-        x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_test)
+        x = KDMC(dt,x0,v0,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
         dist = dist.append(pd.DataFrame(data={'x':x,'Method':['KD' for _ in range(N)]}))
-        x = mc_standard(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_test,r)
+        x = mc_standard(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_periodic,r)
         dist = dist.append(pd.DataFrame(data={'x':x,'Method':['SS' for _ in range(N)]}))
-        x = Kinetic(N,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary_test)
+        x = Kinetic(N,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary_periodic)
         dist = dist.append(pd.DataFrame(data={'x':x,'Method':['Kinetic' for _ in range(N)]}))
         sns.kdeplot(data=dist, x="x",hue='Method',cut=0,common_norm=False)
         plt.show()
