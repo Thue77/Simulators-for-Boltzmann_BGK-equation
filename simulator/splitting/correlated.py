@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from numba import njit,jit_module,prange
 
 @njit(nogil=True)
-def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
+def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -14,7 +14,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
     M: velocity distribution
     '''
     dt_c = dt_f*M_t
-    x_f,_,v_f = Q(N)
+    x_f,v_f,_ = Q(N)
     x_c = x_f.copy()
     v_bar_c = v_f.copy()
     v_c = v_f.copy()
