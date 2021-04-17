@@ -30,8 +30,8 @@ type = str(sys.argv[2])#'B1'
 a = float(sys.argv[3])#5
 b=float(sys.argv[4])#100
 test = str(sys.argv[5])#'figure 5'
-N_global = int(sys.argv[6])
-print(f'a={a}, b={b},type={type}, test={test}')
+N_global = int(sys.argv[6]) #For test run with batch file
+print(f'a={a}, b={b},type={type}, test={test}, epsilon: {epsilon}')
 
 
 '''Methods giving the properties of the plasma'''
@@ -66,7 +66,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
         # v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
         v_norm = v/sigma(x)
-    elif test == 'num_exp':
+    elif test == 'num_exp' or test=='num_exp_ml':
         x,v,v_norm = test2(N)
         v = v/epsilon
     return x,v,v_norm
@@ -81,7 +81,7 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v =  (U <= 0.5).astype(np.float64) - (U > 0.5).astype(np.float64)
         x = np.zeros(N)
         v_norm = v.copy()
-    elif test == 'num_exp':
+    elif test == 'num_exp' or test=='num_exp_ml':
         x,v,v_norm = test2(N)
     return x,v,v_norm
 
@@ -538,9 +538,27 @@ def numerical_experiemnt_mc():
     dist = dist.append(pd.DataFrame(data={'x':x,'Method':['SS' for _ in range(len(x))]}))
     sns.kdeplot(data=dist, x="x",hue='Method',linestyle='--',cut=0,common_norm=False)
 
-
-
-
+def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
+    print('------------Compile functions------------')
+    APML(1,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=10)
+    KDML(1,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=1,N_warm = 10)
+    print('COMPILATION DONE')
+    print('------------Asymptotic splitting results------------')
+    start = time.time()
+    E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N_warm)
+    print(f'time: {time.time()-start}')
+    print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
+    print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
+    print('------------Kinetic-Diffusion results------------')
+    '''Determine lowest possible L. Do it by going two step sizes beyond the point
+    where the variance is maximal, which is approxiamtely 1/R(0)'''
+    # mode = 1/R(0)
+    L=1
+    start = time.time()
+    E,V,C,N,levels = KDML(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=L,N_warm = N_warm)
+    print(f'time: {time.time()-start}')
+    print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
+    print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
 '''Exists in separate file as well'''
 def plot_var(V,V_d):
     dt_list = 1/2**np.arange(0,22,1)
@@ -713,3 +731,6 @@ if __name__ == '__main__':
 
         '''
         M_t = 2; t0 = 0; T = 0.1
+        e2 = float(input('Give MSE: '))
+        N_warm = int(input('Give minimum number of paths: '))
+        numerical_experiemnt_ml(e2,t0,T,M_t,N_warm)
