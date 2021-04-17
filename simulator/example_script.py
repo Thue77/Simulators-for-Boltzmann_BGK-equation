@@ -86,45 +86,45 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     return x,v,v_norm
 
 #sets the collision rate
-def R(x,alpha=0,beta=1):
+def R(x):
     if type == 'default':
         return 1/(epsilon**2)
     elif type == 'B1':
         return -b*(a*(x-1)-1)*(x<=1) + b*(a*(x-1)+1)*np.logical_not(x<=1)
     elif type=='A':
-        return 1/epsilon**2*(alpha*x+beta)
+        return 1/epsilon**2*(a*x+b)
 
-def r(x,alpha=0,beta=1):
+def r(x):
     if type == 'A':
-        return alpha*x+beta
+        return a*x+b
     elif type=='default' or test == 'APML':
         return 1
 
-def dR(x,alpha=0,beta=1):
+def dR(x):
     if type == 'default':
         return 0
     elif type == 'B1':
         return (x<=1)*(-b*a) + (x>1)*(b*a)
     elif type=='A':
-        if alpha==0:
+        if a==0:
             return 0
         else:
-            return alpha/epsilon**2
+            return a/epsilon**2
 
 #Anti derivative of R
-def R_anti(x,alpha=0,beta=1):
+def R_anti(x):
     if type == 'default':
         return x/(epsilon**2)
     elif type == 'B1':
         return (-b*a/2*x**2 + (a+1)*b*x)*(x<=1) + (b*a/2*x**2+(1-a)*b*x)*(x>1)
     elif type=='A':
-        return 1/epsilon**2*(alpha/2*x**2+beta*x)
+        return 1/epsilon**2*(a/2*x**2+b*x)
 
 
 
 #Sample Collision
 # @njit(nogil=True,parallel = True)
-def SC(x,v,e,alpha=0,beta=1):
+def SC(x,v,e):
     if type == 'default' or a==0:
         dtau = 1/R(x)*e
     elif (type == 'B1' or type == 'B2') and a!=0:
@@ -175,10 +175,10 @@ def SC(x,v,e,alpha=0,beta=1):
             '''Update x to equal the value of the boundary that it is crossing'''
             x_new[index_new] = boundaries[bins[index_new] + (direction[index_new]<0)]
     elif type=='A':
-        if alpha==0:
+        if a==0:
             dtau = 1/R(x)*e
         else:
-            dtau = (-alpha*x-beta + np.sqrt((alpha*x+beta)**2+2*alpha*v*epsilon**2*e))/(alpha*v)
+            dtau = (-a*x-b + np.sqrt((a*x+b)**2+2*a*v*epsilon**2*e))/(a*v)
     return dtau
 
 @njit(nogil=True,parallel = True)
@@ -207,14 +207,14 @@ def integral_to_boundary(x,bins,direction,slopes,intercepts):
 def mu(x):
     if test == 'figure 4' or test=='APS':
         return 0
-    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML' or 'num_exp':
+    elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML' or test=='num_exp' or test=='num_exp_ml':
         return 0
     elif test == 'num_exp_hom':
         return 0#1/(2*epsilon)
 
 
 def sigma(x):
-    if test == 'figure 4' or test=='APS' or test== 'num_exp':
+    if test == 'figure 4' or test=='APS' or test== 'num_exp' or test=='num_exp_ml':
         return 1/epsilon
     elif test == 'figure 5' or test == 'warm_up' or test == 'select_levels' or test == 'KDML':
         return 1
@@ -708,3 +708,8 @@ if __name__ == '__main__':
         print(f'time: {time.time()-start}')
         print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
         print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
+    elif test == 'num_exp_ml' and type == 'A':
+        '''Big test case for the thesis
+
+        '''
+        M_t = 2; t0 = 0; T = 0.1
