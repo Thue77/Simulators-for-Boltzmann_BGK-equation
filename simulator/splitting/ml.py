@@ -59,9 +59,9 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary):
         E[i] = x_hat(N[i],N_diff[i],E[i],E_temp,Delta)
         SS[i] = Sfunc(N[i],N_diff[i],SS[i],SS_temp,Delta)
         '''Update cost like updating an average'''
-        # C[i] = x_hat(N[i],N_diff[i],C[i],C_temp,delta(C[i],C_temp,N[i],N_diff[i]))
+        C[i] = x_hat(N[i],N_diff[i],C[i],C_temp,delta(C[i],C_temp,N[i],N_diff[i]))
         N[i] = N[i] + N_diff[i]
-    return E,SS,N,N_diff
+    return E,SS,N,N_diff,C
 
 
 @njit(nogil=True)
@@ -87,14 +87,14 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1):
     C: Cost at each level
     '''
     L = len(levels)
-    C = M_t**np.arange(0,L,1); C[1:] = C[1:] + M_t**np.arange(0,L-1,1)
+    # C = M_t**np.arange(0,L,1); C[1:] = C[1:] + M_t**np.arange(0,L-1,1)
     '''While loop to continue until RMSE fits with e2'''
     while True:
         '''Update paths based on N_diff'''
         while np.max(N_diff)>0:
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
-            E,SS,N,N_diff = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary)
+            E,SS,N,N_diff,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary)
             V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
             N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N

@@ -702,7 +702,7 @@ if __name__ == '__main__':
         e2=0.001^2, N=1000
         '''
         M_t = 2; t0=0;T=0.5
-        e2 = 0.001**2;N=1000
+        e2 = 0.01**2;N=500
         start = time.time()
         E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N)
         print(f'time: {time.time()-start}')
