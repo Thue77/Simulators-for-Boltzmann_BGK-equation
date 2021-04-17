@@ -20,8 +20,8 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None):
     v_c = v_f.copy()
     while t<T:
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
-        C = (U>=eps**2/(eps**2+dt_f*r(x_f))) #Indicates if collisions happen
         for m in range(M_t):
+            C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
             x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary)
             v_bar_c[C[:,m]] = v_f[C[:,m]]
         z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
