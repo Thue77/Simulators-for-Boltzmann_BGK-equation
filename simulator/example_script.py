@@ -274,7 +274,7 @@ def F(x,v=0):
         return x
 
 
-# jit_module(nopython=True,nogil=True)
+jit_module(nopython=True,nogil=True)
 
 
 '''Tests'''
@@ -702,6 +702,9 @@ if __name__ == '__main__':
         e2=0.001^2, N=1000
         '''
         M_t = 2; t0=0;T=0.5
-        e2 = 0.1**2;N=40
-        E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N)
-        print(f'E: {E} \n V: {V} \n C: {C} \n levels: {levels}')
+        e2 = 0.001**2;N=1000
+        start = time.time()
+        E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N)
+        print(f'time: {time.time()-start}')
+        print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
+        print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
