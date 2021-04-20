@@ -146,15 +146,15 @@ def test3(N=10_000):
 def plot_exact():
     x_axis = np.arange(0,1,1e-2)
     v_axis = np.arange(-4,4,8e-2)
-    # f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*v**2*(1+np.cos(2*np.pi*(x+0.5))) #test2
-    f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*(1+np.cos(2*np.pi*(x+0.5))) # test3
+    f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*v**2*(1+np.cos(2*np.pi*(x+0.5))) #test2
+    # f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*(1+np.cos(2*np.pi*(x+0.5))) # test3
     X, V = np.meshgrid(x_axis,v_axis)
     fig = plt.figure(figsize=(13, 7))
     ax = plt.axes(projection='3d')
     ax.set_xlabel('x')
     ax.set_ylabel('v')
     ax.set_zlabel('PDF')
-    ax.set_title('Surface plot of exact f(x,v,t=0)')
+    ax.set_title('Surface plot of f(x,v,t=0)')
     surf = ax.plot_surface(X, V, f(X,V), rstride=1, cstride=1, edgecolor='none')
 
 
@@ -166,8 +166,8 @@ if __name__ == '__main__':
     # sns.kdeplot(data=dist, x="x",hue='q(x)',linestyle='dashed')
     # plt.plot(np.arange(0,1,0.001),rho(np.arange(0,1,0.001)),label='p(x)')
     # plt.legend(labels=['Estimated p(x)','p(x)'])
-    X,V,_ = test3(500_000)
-    plot_test(np.vstack((X,V)))
+    # X,V,_ = test3(500_000)
+    # plot_test(np.vstack((X,V)))
     plot_exact()
 
 

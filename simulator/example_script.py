@@ -553,7 +553,7 @@ def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
     '''Determine lowest possible L. Do it by going two step sizes beyond the point
     where the variance is maximal, which is approxiamtely 1/R(0)'''
     # mode = 1/R(0)
-    L=1
+    L=1 
     start = time.time()
     E,V,C,N,levels = KDML(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=L,N_warm = N_warm)
     print(f'time: {time.time()-start}')
