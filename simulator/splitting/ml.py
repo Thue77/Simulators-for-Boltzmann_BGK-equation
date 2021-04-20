@@ -93,6 +93,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1):
         '''Update paths based on N_diff'''
         while np.max(N_diff)>0:
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
+            N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*50_000)
             # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
             E,SS,N,N_diff,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary)
             V = SS/(N-1) #Update variance
@@ -109,7 +110,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1):
         #     print(N_diff)
         N = np.append(N,0).astype(np.int64)
         E = np.append(E,0.0); V = np.append(V,0.0); SS = np.append(SS,0.0)
-        C = np.append(C,M_t**(L-1)+M_t**(L-2)); #C = np.append(C,0.0);
+        C = np.append(C,0.0);#np.append(C,M_t**(L-1)+M_t**(L-2)); #
         if strategy==1:
             levels += [eps**2/(M_t**(L-1))]
         else:

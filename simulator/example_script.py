@@ -540,25 +540,42 @@ def numerical_experiemnt_mc():
 
 def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
     print('------------Compile functions------------')
+    # np.set_printoptions(precision=2)
+    pd.set_option('precision', 2)
+    start = time.time()
     APML(1,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=10)
-    KDML(1,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=1,N_warm = 10)
-    print('COMPILATION DONE')
+    # KDML(2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=1,N_warm = 10)
+    print(f'COMPILATION DONE. Time: {time.time()-start}')
     print('------------Asymptotic splitting results------------')
     start = time.time()
     E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N_warm)
     print(f'time: {time.time()-start}')
+    df_APS = pd.DataFrame({'Level': [i for i in range(len(E))],
+                        '\u0394 t_l':levels,'N_l':N,'E':E, 'V_l':V,
+                        'V[Y_l]':V/N,'C_l':C,'Cost':N*C})
+    df_APS=df_APS.append({'Level': '',
+                        '\u0394 t_l':'','N_l':'','E':np.sum(E), 'V_l':'',
+                        'V[Y_l]':np.sum(V/N),'C_l':np.sum(C),'Cost':np.sum(N*C)},ignore_index=True)
     print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
     print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
+    print(df_APS.to_latex(index=False))
     print('------------Kinetic-Diffusion results------------')
     '''Determine lowest possible L. Do it by going two step sizes beyond the point
     where the variance is maximal, which is approxiamtely 1/R(0)'''
     # mode = 1/R(0)
-    L=1 
+    L=1
     start = time.time()
     E,V,C,N,levels = KDML(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=L,N_warm = N_warm)
     print(f'time: {time.time()-start}')
+    df_KD = pd.DataFrame({'Level': [i for i in range(len(E))],
+                        '\u0394 t_l':[(T-t0)/2**l for l in levels],'N_l':N,'E':E, 'V_l':V,
+                        'V[Y_l]':V/N,'C_l':C,'Cost':N*C})
+    df_KD=df_KD.append({'Level': '',
+                        '\u0394 t_l':'','N_l':'','E':np.sum(E), 'V_l':'',
+                        'V[Y_l]':np.sum(V/N),'C_l':np.sum(C),'Cost':np.sum(N*C)},ignore_index=True)
     print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
     print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
+    print(df_KD.to_latex(index=False))
 '''Exists in separate file as well'''
 def plot_var(V,V_d):
     dt_list = 1/2**np.arange(0,22,1)

@@ -149,6 +149,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100)
         '''Update paths based on N_diff'''
         while np.max(N_diff)>0:
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
+            N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*50_000)
             # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
             for i in I:
                 # print(i)
@@ -165,8 +166,8 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100)
                     E_temp = np.mean(x_f-x_c)
                     SS_temp = np.sum((x_f-x_c-E_temp)**2)
                 else:
-                    e = np.random.exponential(scale=1,size=N_diff[i]) #Could maybe be implemented in KDMC
-                    tau = SC(x0,v0,e) #Could maybe be implemented in KDMC
+                    # e = np.random.exponential(scale=1,size=N_diff[i]) #Could maybe be implemented in KDMC
+                    # tau = SC(x0,v0,e) #Could maybe be implemented in KDMC
                     with objmode(start2 = 'f8'):
                         start2 = time.perf_counter()
                     x = KDMC(dt_f,x0,v0,t0,T,mu,sigma,M,R,SC,dR=dR)
