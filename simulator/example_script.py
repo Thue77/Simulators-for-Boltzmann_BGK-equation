@@ -32,6 +32,7 @@ b=float(sys.argv[4])#100
 test = str(sys.argv[5])#'figure 5'
 N_global = int(sys.argv[6]) #For test run with batch file
 print(f'a={a}, b={b},type={type}, test={test}, epsilon: {epsilon}')
+np.random.seed(42)
 
 
 '''Methods giving the properties of the plasma'''
@@ -262,8 +263,8 @@ def boundary_periodic(x):
     l = xL-x0 #Length of x domain
     I_low = (x<x0); I_high = (x>xL);
     x_new = x.copy()
-    x_new[I_low] = x_new[I_low] + l#xL-((x0-x[I_low])%l)#
-    x_new[I_high] = x_new[I_high] - l#x0 + ((x[I_high]-xL)%l)#
+    x_new[I_low] = xL-((x0-x[I_low])%l)#x_new[I_low] + l#
+    x_new[I_high] = x0 + ((x[I_high]-xL)%l)#x_new[I_high] - l#
     return x_new
 
 '''Function related to the quantity of interest, E(F(X,V))'''
@@ -544,11 +545,11 @@ def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
     pd.set_option('precision', 2)
     start = time.time()
     APML(1,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=10)
-    # KDML(2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=1,N_warm = 10)
+    KDML(2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=1,N_warm = 10)
     print(f'COMPILATION DONE. Time: {time.time()-start}')
     print('------------Asymptotic splitting results------------')
     start = time.time()
-    E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N_warm)
+    E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N_warm,boundary=boundary_periodic)
     print(f'time: {time.time()-start}')
     df_APS = pd.DataFrame({'Level': [i for i in range(len(E))],
                         '\u0394 t_l':levels,'N_l':N,'E':E, 'V_l':V,
