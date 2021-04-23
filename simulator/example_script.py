@@ -179,7 +179,30 @@ def SC(x,v,e):
         if a==0:
             dtau = 1/R(x)*e
         else:
-            dtau = (-a*x-b + np.sqrt((a*x+b)**2+2*a*v*epsilon**2*e))/(a*v)
+            xL = 1;
+            I = np.ones(len(x))
+            x_new = x.copy()
+            dtau = np.zeros(len(x));
+            #areas to add to remainder of rhs
+            A = np.zeros(len(x));
+            #remainder of rhs. Changes when particle moves across boundary
+            e_remainder = np.abs(e*v)
+            I_p = v>0 #Indexes with positive velocity
+            I_n = v<0 #Indexes with negative velocity
+            #Value at relevant boundary
+            x_b = I_p*xL+I_n*0
+            while np.sum(I)>0:
+                #integral to boundary
+                A[I_n] = a/2*x_new[I_n]**2 + b*x_new[I_n]
+                A[I_p] = a/2*(xL**2-x_new[I_p]**2)+b*(x_L-x_new[I_p])
+                I_new_domain = A[I]<e_remainder[I]
+                I_same_domain = A[I]>e_remainder[I]
+                dtau[I_new_domain] = dtau[I_new_domain] + (x_b[I_new_domain]-x_new[I_new_domain])/v[I_new_domain]
+                dtau[I_same_domain] = (-a*x_new[I_same_domain]-b + np.sqrt((a*x_new[I_same_domain]+b)**2+2*a*v[I_same_domain]*epsilon**2*e[I_same_domain]))/(a*v[I_same_domain])
+                e_remainder[I_new_domain] = e_remainder[I_new_domain]-A[I_new_domain]
+                x_new[I_new_domain] = x_b[I_new_domain]
+                I = I_new_domain.copy()
+                I_p=I_p*I; I_n=I_n*I;
     return dtau
 
 @njit(nogil=True,parallel = True)
@@ -545,7 +568,7 @@ def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
     pd.set_option('precision', 2)
     start = time.time()
     APML(1,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=10)
-    KDML(2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=1,N_warm = 10)
+    KDML(1,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=1,N_warm = 10)
     print(f'COMPILATION DONE. Time: {time.time()-start}')
     print('------------Asymptotic splitting results------------')
     start = time.time()
@@ -566,7 +589,7 @@ def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
     # mode = 1/R(0)
     L=1
     start = time.time()
-    E,V,C,N,levels = KDML(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=L,N_warm = N_warm)
+    E,V,C,N,levels = KDML(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=L,N_warm = N_warm,boundary=boundary_periodic)
     print(f'time: {time.time()-start}')
     df_KD = pd.DataFrame({'Level': [i for i in range(len(E))],
                         '\u0394 t_l':[(T-t0)/2**l for l in levels],'N_l':N,'E':E, 'V_l':V,
@@ -577,9 +600,46 @@ def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
     print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
     print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
     print(df_KD.to_latex(index=False))
+
+
+# @njit(nogil=True,parallel=True)
+def cor_test_num_exp(N):
+    cache = 50_000
+    dt_list = 0.1/2**np.arange(0,14,1)
+    runs = int(max(N/cache,1))
+    n = cache#int(N/cache) if N>cache else N
+    V = np.zeros((runs,len(dt_list))); E = np.zeros((runs,len(dt_list)))
+    V_d = np.zeros((runs,len(dt_list)-1)); E_bias = np.zeros((runs,len(dt_list)-1))
+    if runs >1:
+        for j in prange(runs):
+            x0,v0,v_l1_next = Q(n)
+            for i in prange(len(dt_list)-1):
+                x_f,x_c = AP_C(dt_list[i+1],2,0,0.1,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
+                # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary_periodic)
+                E_bias[j,i] = np.mean(x_f-x_c)
+                V_d[j,i] = np.sum((x_f-x_c-E_bias[j,i])**2)
+                E[j,i] = np.mean(x_c)
+                V[j,i] = np.sum((x_c-E[j,i])**2)
+                if i == len(dt_list)-2:
+                    E[j,i+1] = np.mean(x_f)
+                    V[j,i+1] = np.sum((x_f-E[j,i+1])**2)
+        V_out,_ = add_sum_of_squares_alongaxis(V,E,cache)
+        V_d_out,_ = add_sum_of_squares_alongaxis(V_d,E_bias,cache)
+        return V_out/(N-1),V_d_out/(N-1)
+    else:
+        x0,v0,v_l1_next = Q(N)
+        for i in prange(len(dt_list)-1):
+            x_f,x_c = AP_C(dt_list[i+1],2,0,0.1,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
+            # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,boundary=boundary_periodic)
+            V_d[0,i] = np.var(x_f-x_c)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
+            V[0,i] = np.var(x_c)#np.sum((x_c-np.mean(x_c))**2)
+            if i == len(dt_list)-2: V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
+        return V[0,:],V_d[0,:]
+
+
 '''Exists in separate file as well'''
 def plot_var(V,V_d):
-    dt_list = 1/2**np.arange(0,22,1)
+    dt_list = 0.1/2**np.arange(0,14,1)
     plt.plot(dt_list[:-1],V_d,':', label = f'a={a}')
     plt.plot(dt_list,V,'--',color = plt.gca().lines[-1].get_color())
     plt.title(f'b = {b}, type: {type}')
@@ -662,7 +722,7 @@ if __name__ == '__main__':
         '''Plot the fine and coarse path of the APML method under the Goldstein-
         Taylor model to compare with article on APML. Set epsilon = 0.5'''
         dt_f = 0.2;M_t=5;t=0;T=10;N=1
-        AP_C_test(dt_f,M_t,t,T,epsilon,N,Q_nu,M_nu,plot=True)
+        AP_C_test(dt_f,M_t,t,T,epsilon,N,Q_nu,M_nu,r=r,plot=True)
     elif test == 'var_path' and type=='Goldstein-Taylor':
         '''Plot the variance fine and coarse paths and their difference of the
         APML method under the Goldstein-Taylor model to compare with article on APML.
@@ -742,13 +802,47 @@ if __name__ == '__main__':
         start = time.time()
         E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N)
         print(f'time: {time.time()-start}')
-        print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
-        print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
+        df_APS = pd.DataFrame({'Level': [i for i in range(len(E))],
+                            '\u0394 t_l':levels,'N_l':N,'E':E, 'V_l':V,
+                            'V[Y_l]':V/N,'C_l':C,'Cost':N*C})
+        print(df_APS)
+        # print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
+        # print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
     elif test == 'num_exp_ml' and type == 'A':
         '''Big test case for the thesis
 
         '''
-        M_t = 2; t0 = 0; T = 0.1
-        e2 = float(input('Give MSE: '))
-        N_warm = int(input('Give minimum number of paths: '))
-        numerical_experiemnt_ml(e2,t0,T,M_t,N_warm)
+        if False:
+            M_t = 2; t0 = 0; T = 0.1
+            e2 = float(input('Give MSE: '))
+            N_warm = int(input('Give minimum number of paths: '))
+            numerical_experiemnt_ml(e2,t0,T,M_t,N_warm)
+        else:
+            V,V_d = cor_test_num_exp(20_000)
+            plot_var(V,V_d)
+
+
+
+
+        # print('--------------Level 0----------- ')
+        # # x = APSMC(0.1,t0,T,100_000,epsilon,Q,M,r)
+        # # print(f'Without boundary conditions: {np.var(x)}')
+        # print('Compile both functions')
+        # x = APSMC(0.1,t0,T,100,epsilon,Q,M,r,boundary = boundary_periodic)
+        # x_f,x_c=AP_C(0.05,2,t0,T,epsilon,100,Q,M,r,boundary=boundary_periodic)
+        # print('-------Compile Done-------')
+        # start = time.time()
+        # x = APSMC(0.1,t0,T,100_000,epsilon,Q,M,r,boundary = boundary_periodic)
+        # print(f'With boundary conditions: {np.var(x)}, time: {(time.time()-start)/100_000}')
+        # print('--------------Level 1----------- ')
+        # # x_f,x_c=AP_C(0.05,2,t0,T,epsilon,100_000,Q,M,r)
+        # # print(f'Without boundary conditions: {np.var(x_f-x_c)}')
+        # start = time.time()
+        # x_f,x_c=AP_C(0.05,2,t0,T,epsilon,100_000,Q,M,r,boundary=boundary_periodic)
+        # print(f'With boundary conditions: {np.var(x_f-x_c)}, time: {(time.time()-start)/100_000}')
+        # print('--------------Level 2----------- ')
+        # start = time.time()
+        # x_f,x_c=AP_C(0.025,2,t0,T,epsilon,100_000,Q,M,r,boundary=boundary_periodic)
+        # print(f'With boundary conditions: {np.var(x_f-x_c)}, time: {(time.time()-start)/100_000}')
+        # # x_f,x_c=AP_C(0.025,2,t0,T,epsilon,100_000,Q,M,r)
+        # # print(f'Without boundary conditions: {np.var(x_f-x_c)}')
