@@ -134,7 +134,7 @@ def diff_np(a):
     return a[1:]-a[:-1]
 
 @njit(nogil=True)
-def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100):
+def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100,boundary=None):
     '''First do warm-up and select levels with L being the maximum level'''
     levels,N,E,V,C = select_levels(L,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,N_warm,tau)
     '''Variances will be updated and saved as sum of squares'''
@@ -159,7 +159,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100)
                     dt_c = (T-t0)/2**levels[i-1]
                     with objmode(start1 = 'f8'):
                         start1 = time.perf_counter()
-                    x_f,x_c = correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR)
+                    x_f,x_c = correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary)
                     with objmode(end1 = 'f8'):
                         end1 = time.perf_counter()
                     C_temp = (end1-start1)/N_diff[i]
@@ -170,7 +170,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100)
                     # tau = SC(x0,v0,e) #Could maybe be implemented in KDMC
                     with objmode(start2 = 'f8'):
                         start2 = time.perf_counter()
-                    x = KDMC(dt_f,x0,v0,t0,T,mu,sigma,M,R,SC,dR=dR)
+                    x = KDMC(dt_f,x0,v0,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
                     with objmode(end2 = 'f8'):
                         end2 = time.perf_counter()
                     C_temp = (end2-start2)/N_diff[i]
