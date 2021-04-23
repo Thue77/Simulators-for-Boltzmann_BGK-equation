@@ -7,7 +7,7 @@ from numba import jit_module,njit,prange
 
 '''Method for correlating paths of different levels in the Multilevel Monte Carlo
     method'''
-def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],R_anti = None,dR=None):
+def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],R_anti = None,dR=None,boundary=None):
     '''
     dt_f: time step for fine level
     dt_c: time step for coarse level
@@ -47,7 +47,7 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
             # v_save = np.c_[v_save,v_rv*Srv]; e_save = np.c_[e_save,e_rv*Srv]; xi_save = np.c_[xi_save,xi_rv*Srv]
             input = np.zeros(n2); input[save_rv2] = xi_rv[save_rv].copy(); xi_save = c_np(xi_save,input)
             theta_k1 = dt_f - np.mod(tau_k1[move],dt_f)
-            x_k1[move],v_k1[move],t_k1[move],v_next = phi_KD(dt_f,x_k1[move],v_k1[move],t_k1[move],tau_k1[move],xi_rv,mu,sigma,M,R,dR=dR)# self.S_KD(dt_f,x_k1[move],v_k1[move],t_k1[move],(self.mu(x_k1[move])+self.sigma(x_k1[move])*v_rv),tau_k1[move],e_rv,xi_rv)
+            x_k1[move],v_k1[move],t_k1[move],v_next = phi_KD(dt_f,x_k1[move],v_k1[move],t_k1[move],tau_k1[move],xi_rv,mu,sigma,M,R,dR=dR,boundary=boundary)# self.S_KD(dt_f,x_k1[move],v_k1[move],t_k1[move],(self.mu(x_k1[move])+self.sigma(x_k1[move])*v_rv),tau_k1[move],e_rv,xi_rv)
             input = np.zeros(n2); input[save_rv2] = v_next[save_rv].copy(); v_save = c_np(v_save,input)
 
             input = np.zeros(n2); input[save_rv2] = x_k1[move[Srv_n]].copy(); x_save = c_np(x_save,input)
@@ -82,7 +82,7 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
             e_old,_ = get_last_nonzero_col(e_save)#e_save[range(n2),(e_save!=0).cumsum(1).argmax(1)]#np.choose((e_save!=0).cumsum(1).argmax(1),e_save.T)
             e_k2 = e_old - temp
             xi_k2 = get_xi(v_save[:,1:-1],x_save,xi_save,tau,theta,sigma,R(x_save))
-            x_k2[i2],v_k2[i2],t_k2[i2],_ = phi_KD(dt_c,x_k2[i2],v_k2[i2],t_k2[i2],tau_k2[i2],xi_k2,mu,sigma,M,R,v_rv=v_l1_next,dR=dR)# self.S_KD(dt_c,x_k2[i2],v_k2[i2],t_k2[i2],(self.mu(x_k2[i2])+self.sigma(x_k2[i2])*v_l1_next),tau_k2[i2],e_k2,xi_k2)
+            x_k2[i2],v_k2[i2],t_k2[i2],_ = phi_KD(dt_c,x_k2[i2],v_k2[i2],t_k2[i2],tau_k2[i2],xi_k2,mu,sigma,M,R,v_rv=v_l1_next,dR=dR,boundary=boundary)# self.S_KD(dt_c,x_k2[i2],v_k2[i2],t_k2[i2],(self.mu(x_k2[i2])+self.sigma(x_k2[i2])*v_l1_next),tau_k2[i2],e_k2,xi_k2)
             tau_k2[i2] = SC(x_k2[i2],v_k2[i2],e_k2)
         '''Test if any paths are still active'''
         I1 = (t_k1+tau_k1)<T; I2 = (t_k2+tau_k2)<T
