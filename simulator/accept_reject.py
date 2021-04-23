@@ -166,8 +166,8 @@ if __name__ == '__main__':
     # sns.kdeplot(data=dist, x="x",hue='q(x)',linestyle='dashed')
     # plt.plot(np.arange(0,1,0.001),rho(np.arange(0,1,0.001)),label='p(x)')
     # plt.legend(labels=['Estimated p(x)','p(x)'])
-    # X,V,_ = test3(500_000)
-    # plot_test(np.vstack((X,V)))
+    X,V,_ = test2(500_000)
+    plot_test(np.vstack((X,V)))
     plot_exact()
 
 
