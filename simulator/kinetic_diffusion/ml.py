@@ -133,6 +133,42 @@ def diff_np(a):
     '''Replacement for np.diff'''
     return a[1:]-a[:-1]
 
+@njit(nogil=True,parallel=True)
+def update_path(I,E,SS,C,N,N_diff,levels,t0,T,mu,sigma,M,R,SC,R_anti,dR,boundary):
+    for j in prange(len(I)):
+        i=I[j]
+        dt_f = (T-t0)/2**levels[i]
+        x0,v0,v_l1_next = Q(N_diff[i])
+        if i!=0:
+            dt_c = (T-t0)/2**levels[i-1]
+            with objmode(start1 = 'f8'):
+                start1 = time.perf_counter()
+            x_f,x_c = correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary)
+            with objmode(end1 = 'f8'):
+                end1 = time.perf_counter()
+            C_temp = (end1-start1)/N_diff[i]
+            E_temp = np.mean(x_f-x_c)
+            SS_temp = np.sum((x_f-x_c-E_temp)**2)
+        else:
+            # e = np.random.exponential(scale=1,size=N_diff[i]) #Could maybe be implemented in KDMC
+            # tau = SC(x0,v0,e) #Could maybe be implemented in KDMC
+            with objmode(start2 = 'f8'):
+                start2 = time.perf_counter()
+            x = KDMC(dt_f,x0,v0,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
+            with objmode(end2 = 'f8'):
+                end2 = time.perf_counter()
+            C_temp = (end2-start2)/N_diff[i]
+            E_temp = np.mean(x)
+            SS_temp = np.sum((x-E_temp)**2)
+        Delta = delta(E[i],E_temp,N[i],N_diff[i])
+        E[i] = x_hat(N[i],N_diff[i],E[i],E_temp,Delta)
+        SS[i] = Sfunc(N[i],N_diff[i],SS[i],SS_temp,Delta)
+        '''Update cost like updating an average'''
+        C[i] = x_hat(N[i],N_diff[i],C[i],C_temp,delta(C[i],C_temp,N[i],N_diff[i]))
+        N[i] = N[i] + N_diff[i]
+    return E,SS,N,N_diff,C
+
+
 @njit(nogil=True)
 def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100,boundary=None):
     '''First do warm-up and select levels with L being the maximum level'''
@@ -150,38 +186,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100,
         while np.max(N_diff)>0:
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*50_000)
-            # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
-            for i in I:
-                # print(i)
-                dt_f = (T-t0)/2**levels[i]
-                x0,v0,v_l1_next = Q(N_diff[i])
-                if i!=0:
-                    dt_c = (T-t0)/2**levels[i-1]
-                    with objmode(start1 = 'f8'):
-                        start1 = time.perf_counter()
-                    x_f,x_c = correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary)
-                    with objmode(end1 = 'f8'):
-                        end1 = time.perf_counter()
-                    C_temp = (end1-start1)/N_diff[i]
-                    E_temp = np.mean(x_f-x_c)
-                    SS_temp = np.sum((x_f-x_c-E_temp)**2)
-                else:
-                    # e = np.random.exponential(scale=1,size=N_diff[i]) #Could maybe be implemented in KDMC
-                    # tau = SC(x0,v0,e) #Could maybe be implemented in KDMC
-                    with objmode(start2 = 'f8'):
-                        start2 = time.perf_counter()
-                    x = KDMC(dt_f,x0,v0,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
-                    with objmode(end2 = 'f8'):
-                        end2 = time.perf_counter()
-                    C_temp = (end2-start2)/N_diff[i]
-                    E_temp = np.mean(x)
-                    SS_temp = np.sum((x-E_temp)**2)
-                Delta = delta(E[i],E_temp,N[i],N_diff[i])
-                E[i] = x_hat(N[i],N_diff[i],E[i],E_temp,Delta)
-                SS[i] = Sfunc(N[i],N_diff[i],SS[i],SS_temp,Delta)
-                '''Update cost like updating an average'''
-                C[i] = x_hat(N[i],N_diff[i],C[i],C_temp,delta(C[i],C_temp,N[i],N_diff[i]))
-                N[i] = N[i] + N_diff[i]
+            E,SS,N,N_diff,C = update_path(I,E,SS,C,N,N_diff,levels,t0,T,mu,sigma,M,R,SC,R_anti,dR,boundary)
             V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
             N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
