@@ -98,8 +98,8 @@ def R(x):
 def r(x):
     if type == 'A':
         return a*x+b
-    elif type=='default' or test == 'APML':
-        return 1
+    else:
+        return np.ones(len(x))
 
 def dR(x):
     if type == 'default':
@@ -417,15 +417,15 @@ def APML_cor_test_fig_5(N):
     V = np.zeros((runs,len(dt_list)-1)); E = np.zeros((runs,len(dt_list)-1))
     V_d = np.zeros((runs,len(dt_list)-1)); E_d = np.zeros((runs,len(dt_list)-1))
     if runs >1:
-        for r in prange(runs):
+        for j in prange(runs):
             # x0,v0,v_l1_next = Q(n)
             for i in range(len(dt_list)-1):
                 # print(dt_list[i])
-                x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,n,Q_nu,M_nu)
-                E_d[r,i] = np.mean(x_f**2-x_c**2)
-                V_d[r,i] = np.sum((x_f**2-x_c**2-E_d[r,i])**2)
-                E[r,i] = np.mean(x_c**2)
-                V[r,i] = np.sum((x_c**2-E[r,i])**2)
+                x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,n,Q_nu,M_nu,r)
+                E_d[j,i] = np.mean(x_f**2-x_c**2)
+                V_d[j,i] = np.sum((x_f**2-x_c**2-E_d[j,i])**2)
+                E[j,i] = np.mean(x_c**2)
+                V[j,i] = np.sum((x_c**2-E[j,i])**2)
                 # if i == len(dt_list)-2:
                 #     E[r,i+1] = np.mean(x_f)
                 #     V[r,i+1] = np.sum((x_f-E[r,i+1])**2)
@@ -602,10 +602,10 @@ def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
     print(df_KD.to_latex(index=False))
 
 
-# @njit(nogil=True,parallel=True)
+@njit(nogil=True,parallel=True)
 def cor_test_num_exp(N):
     cache = 50_000
-    dt_list = 0.1/2**np.arange(0,14,1)
+    dt_list = 0.1/2**np.arange(0,19,1)
     runs = int(max(N/cache,1))
     n = cache#int(N/cache) if N>cache else N
     V = np.zeros((runs,len(dt_list))); E = np.zeros((runs,len(dt_list)))
@@ -614,8 +614,8 @@ def cor_test_num_exp(N):
         for j in prange(runs):
             x0,v0,v_l1_next = Q(n)
             for i in prange(len(dt_list)-1):
-                x_f,x_c = AP_C(dt_list[i+1],2,0,0.1,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
-                # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary_periodic)
+                # x_f,x_c = AP_C(dt_list[i+1],2,0,0.1,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
+                x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary_periodic)
                 E_bias[j,i] = np.mean(x_f-x_c)
                 V_d[j,i] = np.sum((x_f-x_c-E_bias[j,i])**2)
                 E[j,i] = np.mean(x_c)
@@ -629,8 +629,8 @@ def cor_test_num_exp(N):
     else:
         x0,v0,v_l1_next = Q(N)
         for i in prange(len(dt_list)-1):
-            x_f,x_c = AP_C(dt_list[i+1],2,0,0.1,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
-            # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,boundary=boundary_periodic)
+            # x_f,x_c = AP_C(dt_list[i+1],2,0,0.1,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
+            x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,boundary=boundary_periodic)
             V_d[0,i] = np.var(x_f-x_c)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
             V[0,i] = np.var(x_c)#np.sum((x_c-np.mean(x_c))**2)
             if i == len(dt_list)-2: V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
@@ -639,7 +639,7 @@ def cor_test_num_exp(N):
 
 '''Exists in separate file as well'''
 def plot_var(V,V_d):
-    dt_list = 0.1/2**np.arange(0,14,1)
+    dt_list = 0.1/2**np.arange(0,19,1)
     plt.plot(dt_list[:-1],V_d,':', label = f'a={a}')
     plt.plot(dt_list,V,'--',color = plt.gca().lines[-1].get_color())
     plt.title(f'b = {b}, type: {type}')
@@ -818,7 +818,7 @@ if __name__ == '__main__':
             N_warm = int(input('Give minimum number of paths: '))
             numerical_experiemnt_ml(e2,t0,T,M_t,N_warm)
         else:
-            V,V_d = cor_test_num_exp(20_000)
+            V,V_d = cor_test_num_exp(10_000)
             plot_var(V,V_d)
 
 
