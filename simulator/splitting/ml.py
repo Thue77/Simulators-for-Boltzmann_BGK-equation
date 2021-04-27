@@ -13,8 +13,9 @@ def select_levels(t0,T,M_t,eps,F,strategy=1,cold_start=True,N=100,boundary=None)
     initial number of paths
     '''
     if strategy==1:
-        levels = [eps**2]
-        levels += [eps**2/M_t]
+        dt_0 = np.minimum(eps**2,T-t0)
+        levels = [dt_0]
+        levels += [dt_0/M_t]
         N_out=np.zeros(2,dtype=np.int64)
         N_diff=np.ones(2,dtype=np.int64)*N
         SS_out = np.zeros(2);C_out = np.zeros(2); E_out=np.zeros(2)
@@ -29,18 +30,25 @@ def select_levels(t0,T,M_t,eps,F,strategy=1,cold_start=True,N=100,boundary=None)
 
 
 @njit(nogil=True,parallel=True)
-def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary):
+def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1):
     for j in prange(len(I)):
         i=I[j]
         # print(i)
         dt_f = levels[i]
-        x0,v0,v_l1_next = Q(N_diff[i])
+        # x0,v0,v_l1_next = Q(N_diff[i])
         if i!=0:
-            with objmode(start1 = 'f8'):
-                start1 = time.perf_counter()
-            x_f,x_c = correlated(dt_f,M_t,t0,T,eps,N_diff[i],Q,M,r,boundary=boundary)
-            with objmode(end1 = 'f8'):
-                end1 = time.perf_counter()
+            if strategy==1 or i!=1:
+                with objmode(start1 = 'f8'):
+                    start1 = time.perf_counter()
+                x_f,x_c = correlated(dt_f,M_t,t0,T,eps,N_diff[i],Q,M,r,boundary=boundary,strategy=strategy)
+                with objmode(end1 = 'f8'):
+                    end1 = time.perf_counter()
+            else:
+                with objmode(start1 = 'f8'):
+                    start1 = time.perf_counter()
+                x_f,x_c = correlated(dt_f,round(levels[0]/dt_f),t0,T,eps,N_diff[i],Q,M,r,boundary=boundary,strategy=strategy)
+                with objmode(end1 = 'f8'):
+                    end1 = time.perf_counter()
             est_f = F(x_f);est_c=F(x_c)
             C_temp = (end1-start1)/N_diff[i]
             E_temp = np.mean(est_f-est_c)
@@ -48,7 +56,7 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary):
         else:
             with objmode(start2 = 'f8'):
                 start2 = time.perf_counter()
-            x = mc(dt_f,t0,T,N_diff[i],eps,Q,M,r,boundary)
+            x = mc(dt_f,t0,T,N_diff[i],eps,Q,M,r,boundary=boundary)
             with objmode(end2 = 'f8'):
                 end2 = time.perf_counter()
             est = F(x)
@@ -77,7 +85,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1):
     r: collision rate
     F: function used to find quantity of interest, E(F(X,V)).
     '''
-    levels,N,N_diff,E,SS,C = select_levels(t0,T,M_t,eps,F,N=N_warm)
+    levels,N,N_diff,E,SS,C = select_levels(t0,T,M_t,eps,F,N=N_warm,strategy=strategy)
     '''
     levels: a list of step sizes for each level
     N: list of number of paths used
@@ -95,7 +103,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1):
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*50_000)
             # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
-            E,SS,N,N_diff,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary)
+            E,SS,N,N_diff,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy)
             V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
             N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
@@ -112,9 +120,9 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1):
         E = np.append(E,0.0); V = np.append(V,0.0); SS = np.append(SS,0.0)
         C = np.append(C,0.0);#np.append(C,M_t**(L-1)+M_t**(L-2)); #
         if strategy==1:
-            levels += [eps**2/(M_t**(L-1))]
+            levels += [levels[0]/(M_t**(L-1))]
         else:
-             levels += [eps**2/(M_t**(L-2))]
+            levels += [levels[1]/(M_t**(L-2))]
     return E,V,C,N,levels
 
 # jit_module(nopython=True,nogil=True)

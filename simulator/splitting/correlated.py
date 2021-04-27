@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from numba import njit,jit_module,prange
 
 @njit(nogil=True)
-def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None):
+def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -14,9 +14,13 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None):
     M: velocity distribution
     '''
     dt_c = dt_f*M_t
+    first_level = np.abs(T-dt_c)<1e-7
     x_f,v_f,_ = Q(N)
     x_c = x_f.copy()
     v_bar_c = v_f.copy()
+    if strategy == 3:
+        v_bar_all = np.zeros((N,M_t))
+        # v_bar_all[0,:] = v_bar_c.copy()
     v_c = v_f.copy()
     while t<T:
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
@@ -24,12 +28,38 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None):
             C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
             x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary)
             v_bar_c[C[:,m]] = v_f[C[:,m]]
-        z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
+            if strategy == 3:
+                v_bar_all[:,m] = v_bar_f
+        if strategy == 3:
+            z_c = improved_corr(dt_f,M_t,eps,x_f,x_c,v_bar_all,v_c,Z,r,first_level)
+        else:
+            z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
         u_c = max_np(U,axis=1)**M_t
         x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary)
         t += dt_c
     return x_f,x_c
-
+@njit(nogil=True)
+def improved_corr(dt_f,M_t,eps,x_f,x_c,v_all,v_c,z,r,first_level):
+    '''Correlates brownian numbers based on article "Multilevel Monte Carlo with
+    Improved Correlation for Kinetic Equations in Diffusive Scaling" '''
+    p_nc = eps**2/(eps**2+dt_f*r(x_f)); p_c = 1-p_nc
+    psi_W = 1/np.sqrt(M_t)*np.sum(z,axis=1)
+    if not first_level:
+        v_var = np.ones(len(x_f))*(M_t + 2*(p_nc*(p_nc**M_t+M_t*p_c-1))/p_c**2)
+    else:
+        v_var = np.ones(len(x_f))*(3*+M_t-2**(2-M_t)-4)
+    psi_T = 1/np.sqrt(v_var)*np.sum(v_all,axis=1)
+    ''''Calculating weights'''
+    if not first_level:
+        dt_c = M_t*dt_f
+        #diffusion coefficient for fine path
+        D_l = dt_f/(eps**2+dt_f*r(x_f))#v_all[:,-1]**2*dt_f/(eps**2+dt_f*r(x_f))
+        #Diffusion coefficient for coarse path
+        D_l1 = v_c**2*dt_c/(eps**2+dt_c*r(x_c))#v_c**2*dt_c/(eps**2+dt_c*r(x_c))
+        theta = D_l*(2*dt_c*D_l1+dt_c**2*(eps/(eps**2+dt_c*r(x_c)))**2)/(D_l1*(2*M_t*dt_f*D_l+dt_f**2*(eps/(eps**2+dt_f*r(x_f)))**2*(M_t+2*p_nc*(p_nc**M_t+M_t*p_c-1)/p_c**2)))
+    else:
+        theta = np.ones(len(x_f))*(4*M_t+1)/(7*M_t-4)
+    return np.sqrt(theta)*psi_W + np.sqrt(1-theta)*psi_T
 '''Function to make different plot tests for homogenous version of correlated method'''
 def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
     '''
