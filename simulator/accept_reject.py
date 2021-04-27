@@ -119,7 +119,8 @@ def test2(N=10_000):
 
 @njit(nogil=True)
 def test3(N=10_000):
-    '''Accept-reject method for f(x,v,t=0)= 1/sqrt(2*pi)*v^2*e^{-v^2/2}*(1+cos(2*pi*(x+1/2)))'''
+    '''Accept-reject method for problem starting in macroscopic state,
+     f(x,v,t=0)= 1/sqrt(2*pi)*e^{-v^2/2}*(1+cos(2*pi*(x+1/2)))'''
     c = 2
     q = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)
     f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*(1+np.cos(2*np.pi*(x+0.5)))

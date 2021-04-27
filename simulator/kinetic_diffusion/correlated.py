@@ -107,8 +107,6 @@ def correlated(dt_f,dt_c,x0,v0,v_l1_next,t0,T,mu:Callable[[np.ndarray],np.ndarra
     return x_out,x_k2
 
 
-
-
 @njit(nogil= True, parallel = True)
 def get_xi(v,x,xi,tau,theta,sigma,R):
     '''
