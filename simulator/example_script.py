@@ -421,7 +421,7 @@ def APML_cor_test_fig_5(N):
             # x0,v0,v_l1_next = Q(n)
             for i in range(len(dt_list)-1):
                 # print(dt_list[i])
-                x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,n,Q_nu,M_nu,r)
+                x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,n,Q_nu,M_nu,r,strategy=3)
                 E_d[j,i] = np.mean(x_f**2-x_c**2)
                 V_d[j,i] = np.sum((x_f**2-x_c**2-E_d[j,i])**2)
                 E[j,i] = np.mean(x_c**2)
@@ -436,7 +436,7 @@ def APML_cor_test_fig_5(N):
     else:
         for i in prange(len(dt_list)-1):
             # print(dt_list[i])
-            x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,N,Q_nu,M_nu)
+            x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,N,Q_nu,M_nu,r,strategy=3)
             V_d[0,i] = np.var(x_f**2-x_c**2)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
             E_d[0,i] = np.mean(x_f**2-x_c**2)
             V[0,i] = np.var(x_c**2)#np.sum((x_c-np.mean(x_c))**2)
@@ -604,8 +604,9 @@ def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
 
 @njit(nogil=True,parallel=True)
 def cor_test_num_exp(N):
-    cache = 50_000
-    dt_list = 0.1/2**np.arange(0,19,1)
+    cache = 2_000
+    T=0.1
+    dt_list = T/2**np.arange(0,22,1)
     runs = int(max(N/cache,1))
     n = cache#int(N/cache) if N>cache else N
     V = np.zeros((runs,len(dt_list))); E = np.zeros((runs,len(dt_list)))
@@ -614,8 +615,8 @@ def cor_test_num_exp(N):
         for j in prange(runs):
             x0,v0,v_l1_next = Q(n)
             for i in prange(len(dt_list)-1):
-                # x_f,x_c = AP_C(dt_list[i+1],2,0,0.1,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
-                x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary_periodic)
+                x_f,x_c = AP_C(dt_list[i+1],2,0,T,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
+                # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary_periodic)
                 E_bias[j,i] = np.mean(x_f-x_c)
                 V_d[j,i] = np.sum((x_f-x_c-E_bias[j,i])**2)
                 E[j,i] = np.mean(x_c)
@@ -629,8 +630,8 @@ def cor_test_num_exp(N):
     else:
         x0,v0,v_l1_next = Q(N)
         for i in prange(len(dt_list)-1):
-            # x_f,x_c = AP_C(dt_list[i+1],2,0,0.1,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
-            x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,boundary=boundary_periodic)
+            x_f,x_c = AP_C(dt_list[i+1],2,0,T,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
+            # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,boundary=boundary_periodic)
             V_d[0,i] = np.var(x_f-x_c)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
             V[0,i] = np.var(x_c)#np.sum((x_c-np.mean(x_c))**2)
             if i == len(dt_list)-2: V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
@@ -639,7 +640,7 @@ def cor_test_num_exp(N):
 
 '''Exists in separate file as well'''
 def plot_var(V,V_d):
-    dt_list = 0.1/2**np.arange(0,19,1)
+    dt_list = 1/2**np.arange(0,22,1)
     plt.plot(dt_list[:-1],V_d,':', label = f'a={a}')
     plt.plot(dt_list,V,'--',color = plt.gca().lines[-1].get_color())
     plt.title(f'b = {b}, type: {type}')
@@ -733,7 +734,7 @@ if __name__ == '__main__':
         '''Plot the variance fine and coarse paths and their difference of the
         APML method under the Goldstein-Taylor model to compare with article on APML.
         Set epsilon = 10,1,0.1'''
-        N=100_000
+        N=10_000
         M_t = 2
         dt_list = 2.5/M_t**np.arange(0,17,1)
         V,E,V_d,E_d=APML_cor_test_fig_5(N)
@@ -798,16 +799,16 @@ if __name__ == '__main__':
         e2=0.001^2, N=1000
         '''
         M_t = 2; t0=0;T=0.5
-        e2 = 0.01**2;N=500
+        e2 = 0.1**2;N=40
         start = time.time()
-        E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N)
+        E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N,strategy=3)
         print(f'time: {time.time()-start}')
         df_APS = pd.DataFrame({'Level': [i for i in range(len(E))],
                             '\u0394 t_l':levels,'N_l':N,'E':E, 'V_l':V,
                             'V[Y_l]':V/N,'C_l':C,'Cost':N*C})
         print(df_APS)
         # print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
-        # print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
+        print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
     elif test == 'num_exp_ml' and type == 'A':
         '''Big test case for the thesis
 
