@@ -5,7 +5,7 @@ from .AddPaths import delta,x_hat,Sfunc
 import time
 from numba import njit,jit_module,prange,objmode
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def select_levels(t0,T,M_t,eps,F,strategy=1,cold_start=True,N=100,boundary=None):
     '''
     strategy: indicates if strategy 1 or 2 is used
@@ -72,7 +72,7 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
     return E,SS,N,N_diff,C
 
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1):
     '''
     e2: bound on mean square error
@@ -125,4 +125,4 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1):
             levels += [levels[1]/(M_t**(L-2))]
     return E,V,C,N,levels
 
-# jit_module(nopython=True,nogil=True)
+jit_module(nopython=True,nogil=True)

@@ -4,7 +4,7 @@ from numba import njit,jit_module,prange
 
 
 def psi_t(x,v,dt,eps,z,r):
-    D = v**2*dt/(eps**2+dt*r(x))
+    D = v**2*dt/(eps**2+dt*r(x))#dt/(eps**2+dt*r(x))#
     A = eps/(eps**2+dt*r(x))*v
     return x + A*dt + np.sqrt(2*dt*D)*z#v*dt + np.sqrt(2*dt*D)*z
 
