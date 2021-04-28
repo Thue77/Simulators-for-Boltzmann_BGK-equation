@@ -290,6 +290,9 @@ def boundary_periodic(x):
     x_new[I_high] = x0 + ((x[I_high]-xL)%l)#x_new[I_high] - l#
     return x_new
 
+def boundary(x):
+    return x
+
 '''Function related to the quantity of interest, E(F(X,V))'''
 def F(x,v=0):
     if test=='APML':
@@ -614,7 +617,7 @@ def cor_test_num_exp(N):
     if runs >1:
         for j in prange(runs):
             x0,v0,v_l1_next = Q(n)
-            for i in prange(len(dt_list)-1):
+            for i in range(len(dt_list)-1):
                 x_f,x_c = AP_C(dt_list[i+1],2,0,T,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
                 # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary_periodic)
                 E_bias[j,i] = np.mean(x_f-x_c)
@@ -819,7 +822,7 @@ if __name__ == '__main__':
             N_warm = int(input('Give minimum number of paths: '))
             numerical_experiemnt_ml(e2,t0,T,M_t,N_warm)
         else:
-            V,V_d = cor_test_num_exp(10_000)
+            V,V_d = cor_test_num_exp(20_000)
             plot_var(V,V_d)
 
 
