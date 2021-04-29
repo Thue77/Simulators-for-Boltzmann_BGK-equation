@@ -134,7 +134,7 @@ def diff_np(a):
     return a[1:]-a[:-1]
 
 @njit(nogil=True,parallel=True)
-def update_path(I,E,SS,C,N,N_diff,levels,t0,T,mu,sigma,M,R,SC,R_anti,dR,boundary):
+def update_path(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,boundary):
     for j in prange(len(I)):
         i=I[j]
         dt_f = (T-t0)/2**levels[i]
@@ -186,7 +186,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100,
         while np.max(N_diff)>0:
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*50_000)
-            E,SS,N,N_diff,C = update_path(I,E,SS,C,N,N_diff,levels,t0,T,mu,sigma,M,R,SC,R_anti,dR,boundary)
+            E,SS,N,N_diff,C = update_path(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,boundary)
             V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
             N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
