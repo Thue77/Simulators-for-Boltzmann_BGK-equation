@@ -13,16 +13,17 @@ def select_levels(t0,T,M_t,eps,F,strategy=1,cold_start=True,N=100,boundary=None)
     initial number of paths
     '''
     if strategy==1:
-        dt_0 = np.minimum(eps**2,T-t0)
+        dt_0 = np.minimum(eps**2,0.025)
         levels = [dt_0]
         levels += [dt_0/M_t]
         N_out=np.zeros(2,dtype=np.int64)
         N_diff=np.ones(2,dtype=np.int64)*N
         SS_out = np.zeros(2);C_out = np.zeros(2); E_out=np.zeros(2)
     else:
-        levels = [T-t0]
-        levels += [eps**2]
-        levels += [eps**2/M_t]
+        levels = [float(T-t0)]
+        dt_1 = np.minimum(eps**2,0.025)
+        levels += [dt_1]
+        levels += [dt_1/M_t]
         N_out=np.zeros(3,dtype=np.int64)
         N_diff=np.ones(3,dtype=np.int64)*N
         SS_out = np.zeros(3);C_out = np.zeros(3); E_out=np.zeros(3)
