@@ -1,5 +1,5 @@
 import numpy as np
-from .one_step import phi_APS
+from .one_step import phi_APS,phi_APS_new
 import matplotlib.pyplot as plt
 from numba import njit,jit_module,prange
 
@@ -20,7 +20,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
     x_f,v_f,_ = Q(N)
     x_c = x_f.copy()
     v_bar_c = v_f.copy()
-    if strategy == 3:
+    if strategy == 3 and first_level:
         v_bar_all = np.zeros((N,M_t))
         # v_bar_all[0,:] = v_bar_c.copy()
     v_c = v_f.copy()
@@ -30,7 +30,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
             C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
             x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary)
             v_bar_c[C[:,m]] = v_f[C[:,m]]
-            if strategy == 3:
+            if strategy == 3 and first_level:
                 v_bar_all[:,m] = v_f
         if strategy == 3 and first_level:
             z_c = improved_corr(dt_f,M_t,eps,x_f,x_c,v_bar_all,v_c,Z,r,first_level)
@@ -62,6 +62,58 @@ def improved_corr(dt_f,M_t,eps,x_f,x_c,v_all,v_c,z,r,first_level):
     else:
         theta = np.ones(len(x_f))*(4*M_t+1)/(7*M_t-4)
     return np.sqrt(theta)*psi_W + np.sqrt(1-theta)*psi_T
+
+
+'''My correlation with inspiration from strang splitting'''
+@njit(nogil=True)
+def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
+    '''
+    M_t: defined s.t. dt_c=M_t dt_f
+    t: starting time
+    eps: diffusive parameter
+    N: number of paths
+    Q: Initial distribution
+    M: velocity distribution
+    '''
+    dt_c = dt_f*M_t
+    first_level = np.abs(T-dt_c)<1e-7
+    # if first_level:
+    #     print(f'dt_f: {dt_f}, dt_c: {dt_c}, M_t: {M_t}')
+    x_f,v_f,_ = Q(N)
+    x_c = x_f.copy()
+    v_bar_c = v_f.copy()
+    v_c = v_f.copy()
+    while t<T:
+        v_bar_all = np.zeros((N,M_t))
+        Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
+        for m in range(M_t):
+            C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
+            x_f,v_f,v_bar_f = phi_APS_new(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary)
+            v_bar_all[C[:,m]] = v_f[C[:,m]]
+        v_bar_c,z_c = cor_rv(M_t,Z,C,v_bar_all)
+        u_c = max_np(U,axis=1)**M_t
+        x_c,v_c,_ = phi_APS_new(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary)
+        t += dt_c
+    return x_f,x_c
+
+@njit(nogil=True)
+def cor_rv(M_t,Z,C,v_bar_all):
+    z = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
+    '''Determine influence of each v*'''
+    '''The number of 1's in C_a indicate the number of steps that the first velocity
+    influences and the number 2's indicate the number of steps that the second
+    velocity influences'''
+    C_a = np.cumsum(C,axis=1)
+    #number of steps affected by collisions
+    steps = np.count_nonzero(C_a>0,axis=1)
+    theta = np.zeros((C_n.size,np.max(C_a)))
+    count = np.zeros((C_n.size,np.max(C_a)))
+    for i in range(M_t):
+        count[:,i] = np.count_nonzero(C_a==i+1,axis=1)
+    theta = count/steps
+    return np.sum(np.sqrt(theta)*v_bar_all,axis=1),z
+
+
 
 
 
@@ -131,7 +183,6 @@ def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
         plt.legend(title='Type of path')
         plt.show()
     return x_f,x_c
-
 
 
 '''Heterogeneous version where r = r(x)'''
