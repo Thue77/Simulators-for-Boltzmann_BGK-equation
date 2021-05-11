@@ -89,9 +89,13 @@ def test2(N=10_000):
     c = 2.9
     q = lambda x,v: 0.5*1/np.sqrt(2*np.pi)*(np.exp(-(v-np.sqrt(2))**2/2)+np.exp(-(v+np.sqrt(2))**2/2))
     f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*v**2*(1+np.cos(2*np.pi*(x+0.5)))
+    #x in [0,2]
+    #f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*v**2*(0.5+0.5*np.cos(np.pi*(x+1)))
     #Function to generate random numbers from q
     def rq(n):
         x = np.random.uniform(0,1,size=n)
+        #x in [0,2]
+        # x = np.random.uniform(0,2,size=n)
         #Uniform numbers for velocity distribution
         u_v = np.random.uniform(0,1,size=n)
         #positive mean
@@ -119,8 +123,7 @@ def test2(N=10_000):
 
 @njit(nogil=True)
 def test3(N=10_000):
-    '''Accept-reject method for problem starting in macroscopic state,
-     f(x,v,t=0)= 1/sqrt(2*pi)*e^{-v^2/2}*(1+cos(2*pi*(x+1/2)))'''
+    '''Accept-reject method for problem starting in macroscopic state, f(x,v,t=0)= 1/sqrt(2*pi)*e^{-v^2/2}*(1+cos(2*pi*(x+1/2)))'''
     c = 2
     q = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)
     f = lambda x,v:1/np.sqrt(2*np.pi)*np.exp(-v**2/2)*(1+np.cos(2*np.pi*(x+0.5)))
