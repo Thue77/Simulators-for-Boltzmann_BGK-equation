@@ -9,6 +9,7 @@ from splitting.one_step import phi_SS
 from splitting.correlated import correlated as AP_C
 from splitting.correlated import correlated_test as AP_C_test
 from splitting.ml import ml as APML
+from splitting.ml import ml_test as APML_test
 from accept_reject import test1,test2,test3
 from space import Omega
 from AddPaths import Sfunc,delta,x_hat
@@ -18,7 +19,8 @@ from typing import Callable,Tuple
 import numpy as np
 import pandas as pd
 import math
-from numba import njit,jit_module,prange
+from numba import jit,njit,jit_module,prange
+from numba.types import float64, int64
 import time
 import sys
 import os
@@ -295,7 +297,7 @@ def boundary(x):
 
 '''Function related to the quantity of interest, E(F(X,V))'''
 def F(x,v=0):
-    if test=='APML':
+    if test=='APML': #or test == 'num_exp_ml':
         return x**2
     else:
         return x
@@ -368,43 +370,52 @@ def KD_cor_test_fig_4(N):
     plt.show()
 
 @njit(nogil=True,parallel=True)
-def KDML_cor_test_fig_5(N):
+def KDML_cor_test_fig_5(N0):
     '''
     epsilon is irrelevant
     type = 'B1' or 'B2'
     test = 'figure 5'
     set a and b as desired
     '''
-    cache = 10_000
-    dt_list = 1/2**np.arange(0,22,1)
-    runs = int(max(N/cache,1))
+    # cache = 10_000
+    # dt_list = 1/2**np.arange(0,17,1)
+    # runs = int(max(N/cache,1))
+    # n = cache#int(N/cache) if N>cache else N
+
+
+    T=1
+    dt_list = T/2**np.arange(0,17,1)
+    N = np.ones(dt_list.size,dtype=np.int64)*N0
+    cache = rnd1(N/8,0,np.empty_like(N)) #Depends on system and desired usage of cpu
+    runs = 8#int(max(N/cache,1))
     n = cache#int(N/cache) if N>cache else N
+
     V = np.zeros((runs,len(dt_list))); E = np.zeros((runs,len(dt_list)))
     V_d = np.zeros((runs,len(dt_list)-1)); E_bias = np.zeros((runs,len(dt_list)-1))
-    if runs >1:
-        for r in prange(runs):
-            x0,v0,v_l1_next = Q(n)
-            for i in prange(len(dt_list)-1):
-                x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR)
-                E_bias[r,i] = np.mean(x_f-x_c)
-                V_d[r,i] = np.sum((x_f-x_c-E_bias[r,i])**2)
-                E[r,i] = np.mean(x_c)
-                V[r,i] = np.sum((x_c-E[r,i])**2)
-                if i == len(dt_list)-2:
-                    E[r,i+1] = np.mean(x_f)
-                    V[r,i+1] = np.sum((x_f-E[r,i+1])**2)
-        V_out,_ = add_sum_of_squares_alongaxis(V,E,cache)
-        V_d_out,_ = add_sum_of_squares_alongaxis(V_d,E_bias,cache)
-        return V_out/(N-1),V_d_out/(N-1)
-    else:
-        x0,v0,v_l1_next = Q(N)
-        for i in prange(len(dt_list)-1):
-            # print(dt_list[i])
-            x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC,R_anti=R_anti)
-            V_d[0,i] = np.var(x_f-x_c)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
-            V[0,i] = np.var(x_c)#np.sum((x_c-np.mean(x_c))**2)
-            if i == len(dt_list)-2: V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
-        return V[0,:],V_d[0,:]
+    # if runs >1:
+    for r in prange(runs):
+        for i in range(len(dt_list)-1):
+            x0,v0,v_l1_next = Q(n[+1])
+            x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR)
+            E_bias[r,i] = np.mean(x_f-x_c)
+            V_d[r,i] = np.sum((x_f-x_c-E_bias[r,i])**2)
+            E[r,i] = np.mean(x_c)
+            V[r,i] = np.sum((x_c-E[r,i])**2)
+            if i == len(dt_list)-2:
+                E[r,i+1] = np.mean(x_f)
+                V[r,i+1] = np.sum((x_f-E[r,i+1])**2)
+    V_out,_ = add_sum_of_squares_alongaxis(V,E,cache)
+    V_d_out,_ = add_sum_of_squares_alongaxis(V_d,E_bias,cache)
+    return V_out/(N-1),V_d_out/(N[1:]-1)
+    # else:
+    #     x0,v0,v_l1_next = Q(N)
+    #     for i in prange(len(dt_list)-1):
+    #         # print(dt_list[i])
+    #         x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,1,mu,sigma,M,R,SC,R_anti=R_anti)
+    #         V_d[0,i] = np.var(x_f-x_c)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
+    #         V[0,i] = np.var(x_c)#np.sum((x_c-np.mean(x_c))**2)
+    #         if i == len(dt_list)-2: V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
+    #     return V[0,:],V_d[0,:]
 
 
 @njit(nogil=True,parallel=True)
@@ -413,8 +424,8 @@ def APML_cor_test_fig_5(N):
     Test for variance in Figres 6, 7 and 8 in multilevel article by Løvbak.
     '''
     M_t = 2; t=0;T=5
-    cache = 10_000
-    dt_list = 2.5/M_t**np.arange(0,17,1)
+    cache = 2_000
+    dt_list = 2.5/M_t**np.arange(0,22,1)
     runs = int(max(N/cache,1))
     n = cache#int(N/cache) if N>cache else N
     V = np.zeros((runs,len(dt_list)-1)); E = np.zeros((runs,len(dt_list)-1))
@@ -424,14 +435,14 @@ def APML_cor_test_fig_5(N):
             # x0,v0,v_l1_next = Q(n)
             for i in range(len(dt_list)-1):
                 # print(dt_list[i])
-                x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,n,Q_nu,M_nu,r,strategy=3)
+                x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,n,Q_nu,M_nu,r,strategy=1,boundary=boundary)
                 E_d[j,i] = np.mean(x_f**2-x_c**2)
                 V_d[j,i] = np.sum((x_f**2-x_c**2-E_d[j,i])**2)
                 E[j,i] = np.mean(x_c**2)
                 V[j,i] = np.sum((x_c**2-E[j,i])**2)
-                # if i == len(dt_list)-2:
-                #     E[r,i+1] = np.mean(x_f)
-                #     V[r,i+1] = np.sum((x_f-E[r,i+1])**2)
+                if i == len(dt_list)-2:
+                    E[j,i+1] = np.mean(x_f)
+                    V[j,i+1] = np.sum((x_f-E[j,i+1])**2)
         V_out,E_out = add_sum_of_squares_alongaxis(V,E,cache)
         V_d_out,E_d_out = add_sum_of_squares_alongaxis(V_d,E_d,cache)
         return V_out/(N-1),E_out,V_d_out/(N-1),np.abs(E_d_out)
@@ -439,7 +450,7 @@ def APML_cor_test_fig_5(N):
     else:
         for i in prange(len(dt_list)-1):
             # print(dt_list[i])
-            x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,N,Q_nu,M_nu,r,strategy=3)
+            x_f,x_c = AP_C(dt_list[i+1],M_t,0,T,epsilon,N,Q_nu,M_nu,r,strategy=1,boundary=boundary)
             V_d[0,i] = np.var(x_f**2-x_c**2)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
             E_d[0,i] = np.mean(x_f**2-x_c**2)
             V[0,i] = np.var(x_c**2)#np.sum((x_c-np.mean(x_c))**2)
@@ -448,6 +459,29 @@ def APML_cor_test_fig_5(N):
             #     V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
             #     V[0,i+1] = np.mean(x_f)
         return V[0,:],E[0,:],V_d[0,:],np.abs(E_d[0,:])
+
+# @njit(nogil=True,parallel=True)
+# def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
+#     '''If axis is zero then the sum of squares of each coulmn is calculated
+#     A: matrix of sum of squares for each run
+#     A_mean: matrix of means for each run
+#     N: number of paths used in each run
+#     '''
+#     n = A.shape[axis]
+#     m = A.shape[0] if axis==1 else A.shape[1]
+#     ss = A[0,:]
+#     E = np.zeros(m)
+#     for j in prange(m):
+#         mu_old = A_mean[0,j]
+#         # print(mu_old)
+#         for i in range(1,n):
+#             Delta = A_mean[i,j] - mu_old
+#             M = (N*(N*(i)))/(N+N*(i))
+#             ss[j] = ss[j] + A[i,j] + Delta**2*M
+#             mu_old = mu_old + Delta*(N)/(N+N*i)
+#         E[j] = mu_old
+#     return ss,E
+
 
 @njit(nogil=True,parallel=True)
 def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
@@ -465,12 +499,11 @@ def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
         # print(mu_old)
         for i in range(1,n):
             Delta = A_mean[i,j] - mu_old
-            M = (N*(N*(i)))/(N+N*(i))
+            M = (N[j]*(N[j]*(i)))/(N[j]+N[j]*(i))
             ss[j] = ss[j] + A[i,j] + Delta**2*M
-            mu_old = mu_old + Delta*(N*i)/(N+N*i)
+            mu_old = mu_old + Delta*(N[j])/(N[j]+N[j]*i)
         E[j] = mu_old
     return ss,E
-
 
 
 def test_warm_up(N=100,L=21):
@@ -571,11 +604,11 @@ def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
     pd.set_option('precision', 2)
     start = time.time()
     APML(1,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=10)
-    KDML(1,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=1,N_warm = 10)
+    # KDML(1,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=1,N_warm = 10)
     print(f'COMPILATION DONE. Time: {time.time()-start}')
     print('------------Asymptotic splitting results------------')
     start = time.time()
-    E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N_warm,boundary=boundary_periodic)
+    E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N_warm,boundary=boundary_periodic,strategy=1)
     print(f'time: {time.time()-start}')
     df_APS = pd.DataFrame({'Level': [i for i in range(len(E))],
                         '\u0394 t_l':levels,'N_l':N,'E':E, 'V_l':V,
@@ -590,67 +623,74 @@ def numerical_experiemnt_ml(e2,t0,T,M_t,N_warm):
     '''Determine lowest possible L. Do it by going two step sizes beyond the point
     where the variance is maximal, which is approxiamtely 1/R(0)'''
     # mode = 1/R(0)
-    L=1
-    start = time.time()
-    E,V,C,N,levels = KDML(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=L,N_warm = N_warm,boundary=boundary_periodic)
-    print(f'time: {time.time()-start}')
-    df_KD = pd.DataFrame({'Level': [i for i in range(len(E))],
-                        '\u0394 t_l':[(T-t0)/2**l for l in levels],'N_l':N,'E':E, 'V_l':V,
-                        'V[Y_l]':V/N,'C_l':C,'Cost':N*C})
-    df_KD=df_KD.append({'Level': '',
-                        '\u0394 t_l':'','N_l':'','E':np.sum(E), 'V_l':'',
-                        'V[Y_l]':np.sum(V/N),'C_l':np.sum(C),'Cost':np.sum(N*C)},ignore_index=True)
-    print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
-    print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
-    print(df_KD.to_latex(index=False))
+    # L=1
+    # start = time.time()
+    # E,V,C,N,levels = KDML(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,L=L,N_warm = N_warm,boundary=boundary_periodic)
+    # print(f'time: {time.time()-start}')
+    # df_KD = pd.DataFrame({'Level': [i for i in range(len(E))],
+    #                     '\u0394 t_l':[(T-t0)/2**l for l in levels],'N_l':N,'E':E, 'V_l':V,
+    #                     'V[Y_l]':V/N,'C_l':C,'Cost':N*C})
+    # df_KD=df_KD.append({'Level': '',
+    #                     '\u0394 t_l':'','N_l':'','E':np.sum(E), 'V_l':'',
+    #                     'V[Y_l]':np.sum(V/N),'C_l':np.sum(C),'Cost':np.sum(N*C)},ignore_index=True)
+    # print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
+    # print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
+    # print(df_KD.to_latex(index=False))
 
+@jit(int64[:](float64[:], int64, int64[:]),nopython=True)
+def rnd1(x, decimals, out):
+    return np.round_(x, decimals, out).astype(np.int64)
 
 @njit(nogil=True,parallel=True)
 def cor_test_num_exp(N):
-    cache = 2_000
-    T=0.1
-    dt_list = T/2**np.arange(0,22,1)
-    runs = int(max(N/cache,1))
+    cache = rnd1(N/8,0,np.empty_like(N)) #Depends on system and desired usage of cpu
+    T=1
+    dt_list = T/2**np.arange(0,17,1)
+    runs = 8#int(max(N/cache,1))
     n = cache#int(N/cache) if N>cache else N
-    V = np.zeros((runs,len(dt_list))); E = np.zeros((runs,len(dt_list)))
-    V_d = np.zeros((runs,len(dt_list)-1)); E_bias = np.zeros((runs,len(dt_list)-1))
-    if runs >1:
-        for j in prange(runs):
-            x0,v0,v_l1_next = Q(n)
-            for i in range(len(dt_list)-1):
-                x_f,x_c = AP_C(dt_list[i+1],2,0,T,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
-                # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary_periodic)
-                E_bias[j,i] = np.mean(x_f-x_c)
-                V_d[j,i] = np.sum((x_f-x_c-E_bias[j,i])**2)
-                E[j,i] = np.mean(x_c)
-                V[j,i] = np.sum((x_c-E[j,i])**2)
-                if i == len(dt_list)-2:
-                    E[j,i+1] = np.mean(x_f)
-                    V[j,i+1] = np.sum((x_f-E[j,i+1])**2)
-        V_out,_ = add_sum_of_squares_alongaxis(V,E,cache)
-        V_d_out,_ = add_sum_of_squares_alongaxis(V_d,E_bias,cache)
-        return V_out/(N-1),V_d_out/(N-1)
-    else:
-        x0,v0,v_l1_next = Q(N)
-        for i in prange(len(dt_list)-1):
-            x_f,x_c = AP_C(dt_list[i+1],2,0,T,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
-            # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,0.1,mu,sigma,M,R,SC,R_anti=R_anti,boundary=boundary_periodic)
-            V_d[0,i] = np.var(x_f-x_c)#np.sum((x_f-x_c-np.mean(x_f-x_c))**2)
-            V[0,i] = np.var(x_c)#np.sum((x_c-np.mean(x_c))**2)
-            if i == len(dt_list)-2: V[0,i+1] = np.var(x_f)#np.sum((x_f-np.mean(x_f))**2)
-        return V[0,:],V_d[0,:]
+    SS = np.zeros((runs,len(dt_list))); E = np.zeros((runs,len(dt_list)))
+    SS_d = np.zeros((runs,len(dt_list)-1)); E_bias = np.zeros((runs,len(dt_list)-1))
+    # if runs >1:
+    for j in prange(runs):
+        for i in range(len(dt_list)-1):
+            # x0,v0,v_l1_next = Q(n[i+1])
+            # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary)
+            x_f,x_c = AP_C(dt_list[i+1],2,0,T,epsilon,n[i+1],Q_nu,M_nu,r,boundary=boundary)
+            E_bias[j,i] = np.mean(x_f-x_c)
+            SS_d[j,i] = np.sum((x_f-x_c-E_bias[j,i])**2)
+            E[j,i] = np.mean(x_c)
+            SS[j,i] = np.sum((x_c-E[j,i])**2)
+            if i == len(dt_list)-2:
+                E[j,i+1] = np.mean(x_f)
+                SS[j,i+1] = np.sum((x_f-E[j,i+1])**2)
+    SS_out,E_out = add_sum_of_squares_alongaxis(SS,E,cache)
+    SS_d_out,E_d_out = add_sum_of_squares_alongaxis(SS_d,E_bias,cache)
+    return SS_out/(N-1),SS_d_out/(N[1:]-1),E_out,E_d_out
 
+    # else:
+    #     x0,v0,v_l1_next = Q(N)
+    #     for i in prange(len(dt_list)-1):
+    #         x_f,x_c = AP_C(dt_list[i+1],2,0,T,epsilon,n,Q_nu,M_nu,r,boundary=boundary_periodic)
+    #         # x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,T,mu,sigma,M,R,SC,R_anti=R_anti,boundary=boundary_periodic)
+    #         E[0,i] = np.mean(x_c)
+    #         E_bias[0,i] = np.mean(x_f-x_c)
+    #         SS_d[0,i] = np.sum((x_f-x_c-E_bias[0,i])**2)
+    #         SS[0,i] = np.sum((x_c-E[0,i])**2)
+    #         if i == len(dt_list)-2:
+    #             E[0,i+1] = np.mean(x_f)
+    #             SS[0,i+1] = np.sum((x_f-E[0,i+1])**2)
+    #     return SS[0,:]/(N-1),SS_d[0,:]/(N-1),E[0,:],E_bias[0,:]
 
 '''Exists in separate file as well'''
 def plot_var(V,V_d):
-    dt_list = 1/2**np.arange(0,22,1)
-    plt.plot(dt_list[:-1],V_d,':', label = f'a={a}')
+    dt_list = 1/2**np.arange(0,17,1)
+    plt.plot(dt_list[1:],V_d,':', label = f'a={a}')
     plt.plot(dt_list,V,'--',color = plt.gca().lines[-1].get_color())
     plt.title(f'b = {b}, type: {type}')
     plt.xscale('log')
     plt.yscale('log')
     plt.legend()
-    plt.show()
+    # plt.show()
 
 '''Probably redundant:'''
 def update_a(b):
@@ -689,14 +729,15 @@ if __name__ == '__main__':
         else:
             KD_cor_test_fig_4(100_000)
     elif test == 'figure 5' and (type == 'B1' or type == 'B2'):
+        N=56_000
         print('Starting')
         KDML_cor_test_fig_5(10)
         start = time.time()
-        V,V_d = KDML_cor_test_fig_5(N_global)
-        print(f'elapsed time is {time.time()-start}')
+        V,V_d = KDML_cor_test_fig_5(N)
+        print(f'elapsed time per path is {(time.time()-start)/N}')
         # np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
-        # print(f'V: {V}')
         plot_var(V,V_d)
+        plt.show()
     elif test == 'warm_up' and (type == 'B1' or type == 'B2'):
         test_warm_up()
     elif test == 'select_levels' and (type == 'B1' or type == 'B2'):
@@ -737,10 +778,16 @@ if __name__ == '__main__':
         '''Plot the variance fine and coarse paths and their difference of the
         APML method under the Goldstein-Taylor model to compare with article on APML.
         Set epsilon = 10,1,0.1'''
-        N=10_000
+        print('Compile')
+        start=time.time()
+        V,E,V_d,E_d=APML_cor_test_fig_5(8)
+        print(f'Compilation done, time: {time.time()-start}')
+        N=16_000
         M_t = 2
-        dt_list = 2.5/M_t**np.arange(0,17,1)
+        dt_list = 2.5/M_t**np.arange(0,22,1)
+        start = time.time()
         V,E,V_d,E_d=APML_cor_test_fig_5(N)
+        print(f'time per path: {(time.time()-start)/N}')
         '''Alternatively, run with loaded data from var_results directory by
         commenting the above line and uncommenting the below'''
         # script_dir = os.path.dirname(__file__)
@@ -817,13 +864,58 @@ if __name__ == '__main__':
 
         '''
         if False:
-            M_t = 2; t0 = 0; T = 0.1
+            M_t = 2; t0 = 0; T = 1
             e2 = float(input('Give MSE: '))
             N_warm = int(input('Give minimum number of paths: '))
             numerical_experiemnt_ml(e2,t0,T,M_t,N_warm)
         else:
-            V,V_d = cor_test_num_exp(20_000)
-            plot_var(V,V_d)
+            os.chdir("C:/Users/thom1/OneDrive/SDU/Speciale/Programming/Package_version/Simulators-for-Boltzmann_BGK-equation/simulator/Logfiles")
+
+            N=80_000; N0=20; T=1; dt_list = T/2**np.arange(0,17,1); E2=np.array([0.01,0.001,1e-6,1e-8],dtype=np.float64); t0=0; M_t=2
+            logfile = open(f'logfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
+
+            APML_test(N,N0,dt_list,E2,Q,t0,T,M_t,epsilon,M,r,F,logfile)
+
+
+            # print('Compile')
+            # start = time.time()
+            # cor_test_num_exp(8*np.ones(17,dtype=np.int64))
+            # print(f'Compilation done, time: {time.time()-start}')
+            # print(f'R(0): {R(0)}')
+            # # N = np.minimum(56_000,np.flip(24_000*2**np.arange(0,19,dtype=np.int64))).astype(np.int64)
+            # N=np.ones(17,dtype=np.int64)*80_000
+            # print(N)
+            # start = time.time()
+            # V,V_d,E,E_d = cor_test_num_exp(N)
+            # print(f'time per path: {(time.time()-start)/N[0]}')
+            # E_d = np.abs(E_d)
+            # np.savetxt(f'var_a_{a}_b_{b}_type_{type}_epsilon_{epsilon}_KD.txt',np.vstack((V,np.append(V_d,0))))
+            # np.savetxt(f'E_a_{a}_b_{b}_type_{type}_epsilon_{epsilon}_KD.txt',np.vstack((E,np.append(E_d,0))))
+
+
+            # data =   np.loadtxt(f'var_a_0.0_b_1.0_type_A_epsilon_{epsilon}.txt')
+            # V = data[0]; V_d = np.abs(data[1][:-1])
+            # data =   np.loadtxt(f'E_a_0.0_b_1.0_type_A_epsilon_{epsilon}.txt')
+            # E = data[0]; E_d = np.abs(data[1][:-1])
+            # plot_var(V,V_d)
+            # plot_var(E,E_d)
+            # plt.show()
+            #
+            # M_t = 2; t0 = 0; T = 1; N=3_000
+            # x0,v0,v_l1_next = Q(N)
+            # print('compile')
+            # x_f,x_c = KD_C(0.5,1,x0,v0,v_l1_next,0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary)
+            # # x_f,x_c = AP_C(0.5,2,0,T,epsilon,2,Q_nu,M_nu,r,boundary=boundary)
+            # print('compilation done')
+            # dt_list = T/2**np.arange(0,20,1)
+            # Time = []
+            # for i in range(19):
+            #     print(dt_list[i+1])
+            #     start = time.time()
+            #     x_f,x_c = KD_C(dt_list[i+1],dt_list[i],x0,v0,v_l1_next,0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary)
+            #     Time += [(time.time()-start)/N]
+            #     print(f'bias: {np.mean(x_f-x_c)}, time per path: {Time[-1]}')
+            # print(Time)
 
 
 
