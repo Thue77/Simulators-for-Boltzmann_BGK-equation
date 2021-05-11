@@ -116,7 +116,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
         if E.size>=4:
             if alpha is None:
                 L1 = max(1,np.where(levels<=eps**2)[0][0])
-                pa = lin_fit(np.arange(L1,L),np.log2(np.abs(E[L1:L])),1); alpha = pa[0]
+                pa = lin_fit(np.arange(L1,L),np.log2(np.abs(E[L1:L]))); alpha = pa[0]
             test = np.max(np.abs(E[-3:])/M_t**(np.flip(np.arange(0,3))*alpha))/(M_t**alpha-1) < np.sqrt(e2/2)
         else:
             test=False
