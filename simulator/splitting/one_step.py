@@ -26,6 +26,12 @@ def phi_APS(x,v,dt,eps,z,u,B,r,v_next=None,boundary=None):
     v,v_bar = psi_c(x,v,dt,eps,u,B,r,v_next)
     return x,v,v_bar
 
+def phi_APS_new(x,v,dt,eps,z,u,B,r,v_next=None,boundary=None):
+    v,v_bar = psi_c(x,v,dt,eps,u,B,r,v_next)
+    x = psi_t(x,v,dt,eps,z,r)
+    if boundary is not None:
+        x = boundary(x)
+    return x,v,v_bar
 
 def phi_standard(x,v,dt,eps,M,r,boundary):
     #transport step
