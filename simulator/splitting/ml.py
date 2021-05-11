@@ -116,7 +116,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
         if E.size>=4:
             if alpha is None:
                 L1 = max(1,np.where(levels<=eps**2)[0][0])
-                pa = lin_fit(np.arange(L1,L),np.log2(np.abs(E[L1:L]))); alpha = pa[0]
+                pa = lin_fit(np.arange(L1,L),np.log2(np.abs(E[L1:L]))); alpha = -pa[0]
             test = np.max(np.abs(E[-3:])/M_t**(np.flip(np.arange(0,3))*alpha))/(M_t**alpha-1) < np.sqrt(e2/2)
         else:
             test=False
@@ -283,22 +283,18 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
     logfile.close()
 
 
-    # plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
-    # plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
-    # plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
-    # plt.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
-    # plt.title(f'Plot of variance and bias')
-    # plt.xscale('log')
-    # plt.yscale('log')
-    # plt.legend()
-    # plt.figure()
-    # plt.plot(range(1,L),kur1[1:],':',label='kurtosis')
-    # plt.title(f'Plot of kurtosis')
-    # plt.figure()
-    # plt.plot(range(1,L),cons[1:],':',label='kurtosis')
-    # plt.title(f'Plot check of consistency')
-    # plt.show()
-
-# def plot_results():
-#     '''Plots results from resultfile and if logfile is given then it finds the
-#     corresponding resultfile'''
+    plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
+    plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
+    plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
+    plt.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
+    plt.title(f'Plot of variance and bias')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend()
+    plt.figure()
+    plt.plot(range(1,L),kur1[1:],':',label='kurtosis')
+    plt.title(f'Plot of kurtosis')
+    plt.figure()
+    plt.plot(range(1,L),cons[1:],':',label='kurtosis')
+    plt.title(f'Plot check of consistency')
+    plt.show()
