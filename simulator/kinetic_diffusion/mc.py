@@ -1,7 +1,8 @@
 import numpy as np
 from .one_step import phi_KD,__psi_k
 from typing import Callable,Tuple
-from numba import njit
+from numba import njit,prange
+from scipy.stats import wasserstein_distance
 
 '''Standard Monte Carlo method'''
 
@@ -15,7 +16,7 @@ def __put_copy(self,arr,index,new):
 
 #The KDMC method with the use of a step function
 @njit(nogil=True)
-def KDMC(dt,x0,v0,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],
+def KDMC(dt,N,Q,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],
 M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],
 Nested =False,dR=None,boundary=None):
     '''
@@ -32,14 +33,14 @@ Nested =False,dR=None,boundary=None):
     R: collision rate
     SC: method for obtaining the next collision times
     '''
-    n = x0.size
+    n = N
     # r = x0.size
     # n_old = n
     t = np.ones(n)*t0
     # I = (t+tau)<T
     # index = np.argwhere(I).flatten()
     I = np.ones(n)==1;tau = np.ones(n)*T
-    x = x0.copy(); v = v0.copy()
+    x,v,_ = Q(N)
     count = 0
     while True:
         e = np.random.exponential(1,size=np.sum(I,dtype=np.int64))
@@ -87,3 +88,34 @@ M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:C
         x[I] = x[I] + v[I]*(T-t[I])
         if boundary is not None: x = boundary(x)
     return x
+
+@njit(nogil=True,parallel=True)
+def mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary):
+    cores = 8
+    n = round(N/cores)
+    x_KD = np.empty((cores,n))
+    for i in prange(cores):
+        x_KD[i,:] = KDMC(dt,n,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
+    return x_KD.flatten()
+
+@njit(nogil=True,parallel=True)
+def mc2_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary):
+    cores = 8
+    n = round(N/cores)
+    x_std = np.empty((cores,n))
+    for i in prange(cores):
+        x_std[i,:] = Kinetic(n,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary)
+    return x_std.flatten()
+
+def mc_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=None,boundary=None,x_std=None):
+    '''Returns a wasserstein distance and the associated standard deviation'''
+    W_out = np.zeros(dt_list.size); err = np.zeros(dt_list.size)
+    if x_std is None: x_std = mc2_par(80_000,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+    for j,dt in enumerate(dt_list):
+        W = np.zeros(20)
+        print(dt)
+        for i in range(20):
+            x_KD = mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+            W[i] = wasserstein_distance(x_KD,x_std)
+        W_out[j] = np.mean(W); err[j] = np.std(W)
+    return W_out,err
