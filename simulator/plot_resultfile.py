@@ -11,7 +11,7 @@ args = parser.parse_args()
 if args.folder:
     print(os.path.realpath(args.folder))
 path = os.getcwd()
-path += '\'
+path += '\\'
 path += args.folder
 os.chdir(path)
 
