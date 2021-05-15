@@ -4,7 +4,10 @@ from kinetic_diffusion.correlated import correlated as KD_C
 from kinetic_diffusion.correlated import set_last_nonzero_col
 from kinetic_diffusion.ml import warm_up,select_levels,select_levels_data
 from kinetic_diffusion.ml import ml as KDML
-from splitting.mc import mc as APSMC,mc_standard
+from kinetic_diffusion.ml import ml_test as KDML_test
+from splitting.mc import mc as APSMC
+from splitting.mc import mc_standard
+from splitting.mc import mc_density_test as APSMC_density_test
 from splitting.one_step import phi_SS
 from splitting.correlated import correlated as AP_C
 from splitting.correlated import correlated_test as AP_C_test
@@ -24,6 +27,7 @@ from numba.types import float64, int64
 import time
 import sys
 import os
+from datetime import datetime
 np.seterr(all='raise')
 
 
@@ -555,17 +559,17 @@ def test_num_exp_hom_MC():
         df = df.append(pd.DataFrame(data={'x':x,'Diffusion paramter':[f'epsilon = {eps}' for _ in range(len(x))]}))
     sns.kdeplot(data=df, x="x",hue='Diffusion paramter',cut=0,linestyle='dotted',common_norm=False)
 
-def KDML_test():
-    E,V,C,N,levels = KDML(1e-3,Q,0,1,mu,sigma,M,R,SC,R_anti,dR,tau=None,L=22,N_warm = 10)
-    print(f'Multilevel result: {np.sum(E)}')
-    print(N)
-    print(f'levels: {levels}')
-    print(f'variance at each level: {V}')
-    print(f'variance: {np.sum(V/N)}')
-    plt.plot(1/2**levels,V)
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.show()
+# def KDML_test():
+#     E,V,C,N,levels = KDML(1e-3,Q,0,1,mu,sigma,M,R,SC,R_anti,dR,tau=None,L=22,N_warm = 10)
+#     print(f'Multilevel result: {np.sum(E)}')
+#     print(N)
+#     print(f'levels: {levels}')
+#     print(f'variance at each level: {V}')
+#     print(f'variance: {np.sum(V/N)}')
+#     plt.plot(1/2**levels,V)
+#     plt.xscale('log')
+#     plt.yscale('log')
+#     plt.show()
 
 def Kinetic_test():
     N=N_global
@@ -729,15 +733,18 @@ if __name__ == '__main__':
         else:
             KD_cor_test_fig_4(100_000)
     elif test == 'figure 5' and (type == 'B1' or type == 'B2'):
-        N=56_000
-        print('Starting')
-        KDML_cor_test_fig_5(10)
-        start = time.time()
-        V,V_d = KDML_cor_test_fig_5(N)
-        print(f'elapsed time per path is {(time.time()-start)/N}')
+        # N=56_000
+        # print('Starting')
+        # KDML_cor_test_fig_5(10)
+        # start = time.time()
+        # V,V_d = KDML_cor_test_fig_5(N)
+        # print(f'elapsed time per path is {(time.time()-start)/N}')
         # np.savetxt(f'var_a_{a}_b_{b}_type_{type}.txt',np.vstack((V,np.append(V_d,0))))
-        plot_var(V,V_d)
-        plt.show()
+        # plot_var(V,V_d)
+        # plt.show()
+        N=12_000; N0=40; T=1; dt_list = T/2**np.arange(0,17,1); E2=np.array([0.01,0.0001,1e-6],dtype=np.float64); t0=0;
+        logfile=None
+        KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary)
     elif test == 'warm_up' and (type == 'B1' or type == 'B2'):
         test_warm_up()
     elif test == 'select_levels' and (type == 'B1' or type == 'B2'):
@@ -849,16 +856,21 @@ if __name__ == '__main__':
         e2=0.001^2, N=1000
         '''
         M_t = 2; t0=0;T=0.5
-        e2 = 0.01**2;N=500
-        start = time.time()
-        E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N,strategy=3)
-        print(f'time: {time.time()-start}')
-        df_APS = pd.DataFrame({'Level': [i for i in range(len(E))],
-                            '\u0394 t_l':levels,'N_l':N,'E':E, 'V_l':V,
-                            'V[Y_l]':V/N,'C_l':C,'Cost':N*C})
-        print(df_APS)
-        # print(f'E: {E} \n V: {V} \n C: {C} \n N: {N} \n levels: {levels}')
-        print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
+        e2 = 0.01**2;
+        # N=500
+        # start = time.time()
+        # E,V,C,N,levels = APML(e2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,N_warm=N,strategy=3)
+        # print(f'time: {time.time()-start}')
+        # df_APS = pd.DataFrame({'Level': [i for i in range(len(E))],
+        #                     '\u0394 t_l':levels,'N_l':N,'E':E, 'V_l':V,
+        #                     'V[Y_l]':V/N,'C_l':C,'Cost':N*C})
+        # print(df_APS)
+        # print(f'estimate: {np.sum(E)}, total variance: {np.sum(V/N)}, total cost: {np.sum(N*C)}, MSE: {np.sum(V/N)+E[-1]**2}, e2: {e2}')
+
+        N=120_000;N0=50
+        dt_list = T/2**np.arange(0,17,1); E2=np.array([0.01,0.0001,1e-6],dtype=np.float64)
+        logfile = open(f'logfile_APS_Goldstein_Taylor_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
+        APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile)
     elif test == 'num_exp_ml' and type == 'A':
         '''Big test case for the thesis
 
@@ -871,11 +883,15 @@ if __name__ == '__main__':
         else:
             os.chdir("C:/Users/thom1/OneDrive/SDU/Speciale/Programming/Package_version/Simulators-for-Boltzmann_BGK-equation/simulator/Logfiles")
 
-            N=80_000; N0=20; T=1; dt_list = T/2**np.arange(0,17,1); E2=np.array([0.01,0.001,1e-6,1e-8],dtype=np.float64); t0=0; M_t=2
-            logfile = open(f'logfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
+            N=12_000; N0=40; T=1; dt_list = T/2**np.arange(0,17,1); E2=np.array([0.01,0.0001,1e-6],dtype=np.float64); t0=0; M_t=2
 
-            APML_test(N,N0,dt_list,E2,Q,t0,T,M_t,epsilon,M,r,F,logfile)
+            # logfile = open(f'logfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
+            # APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile)
+            # APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q,M,r,F,boundary = boundary)
 
+            # logfile = open(f'logfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
+            logfile=None
+            KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary)
 
             # print('Compile')
             # start = time.time()
