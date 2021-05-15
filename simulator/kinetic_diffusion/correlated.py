@@ -156,12 +156,15 @@ def integral_of_R(R,t_c,t_f,x,v,R_anti):
         start = np.minimum(x,x+v*(t_c-t_f))
         end = np.maximum(x,x+v*(t_c-t_f))
         # #Check if they are in the same domain and that coarse path is ahead of fine path
-        index = np.argwhere(np.logical_and((start<=1)==(end<=1),t_c>t_f)).flatten()
-        I = np.zeros(len(x))
-        I[index] = (R_anti(end[index]) - R_anti(start[index]))/np.abs(v[index])
-        #Find particles where they move into different domain
-        index = np.argwhere(np.logical_and((start<=1)!=(end<=1),t_c>t_f)).flatten()
-        I[index] = ((R_anti(end[index])-R_anti(1+1e-15))+(R_anti(1)- R_anti(start[index])))/np.abs(v[index])
+        index = np.argwhere(t_c>t_f).flatten()
+        I[index] = (R_anti(end[index])-R_anti(start[index]))/np.abs(v[index])
+
+        # index = np.argwhere(np.logical_and((start<=1)==(end<=1),t_c>t_f)).flatten()
+        # I = np.zeros(len(x))
+        # I[index] = (R_anti(end[index]) - R_anti(start[index]))/np.abs(v[index])
+        # #Find particles where they move into different domain
+        # index = np.argwhere(np.logical_and((start<=1)!=(end<=1),t_c>t_f)).flatten()
+        # I[index] = ((R_anti(end[index])-R_anti(1+1e-15))+(R_anti(1)- R_anti(start[index])))/np.abs(v[index])
     return I
 
 
