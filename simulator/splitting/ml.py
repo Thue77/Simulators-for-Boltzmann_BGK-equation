@@ -1,5 +1,5 @@
 import numpy as np
-from .correlated import correlated
+from .correlated import correlated,correlated_ts
 from .mc import mc
 from .AddPaths import delta,x_hat,Sfunc
 import time
@@ -36,7 +36,7 @@ def rnd1(x, decimals, out):
     return np.round_(x, decimals, out).astype(np.int64)
 
 @njit(nogil=True,parallel=True)
-def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1):
+def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1,rev=False):
     # levels = ll.copy()
     cores = 8
     n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff)).astype(np.int64))
@@ -50,7 +50,10 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
                 if strategy==1 or i!=1:
                     with objmode(start1 = 'f8'):
                         start1 = time.perf_counter()
-                    x_f,x_c = correlated(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy)
+                    if rev:
+                        x_f,x_c = correlated_ts(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy)
+                    else:
+                        x_f,x_c = correlated(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy)
                     with objmode(end1 = 'f8'):
                         end1 = time.perf_counter()
                 else:
@@ -66,7 +69,7 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
             else:
                 with objmode(start2 = 'f8'):
                     start2 = time.perf_counter()
-                x = mc(dt_f,t0,T,n[i],eps,Q,M,r,boundary=boundary)
+                x = mc(dt_f,t0,T,n[i],eps,Q,M,r,boundary=boundary,rev=rev)
                 with objmode(end2 = 'f8'):
                     end2 = time.perf_counter()
                 est = F(x)
@@ -82,8 +85,8 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
     return E,SS,N,C
 
 
-@njit(nogil=True)
-def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,beta=None,gamma=None):
+# @njit(nogil=True)
+def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,beta=None,gamma=None,rev=False):
     '''
     e2: bound on mean square error
     Q: initial distribution
@@ -113,7 +116,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*8_000_000)
             # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
-            E,SS,N,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy)
+            E,SS,N,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy,rev=rev)
             V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
             N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
@@ -156,7 +159,7 @@ def lin_fit(x,y):
 
 
 @njit(nogil=True,parallel=True)
-def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy):
+def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False):
     '''Calculates values for consistency test for each level given by dt_list'''
     cores = 8 #Controls parrelisation
 
@@ -189,14 +192,17 @@ def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy):
                 # print(f'l={l}')
                 with objmode(start1 = 'f8'):
                     start1 = time.perf_counter()
-                x_f,x_c = correlated(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary)
+                if rev:
+                    x_f,x_c = correlated_ts(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary)
+                else:
+                    x_f,x_c = correlated(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary)
                 with objmode(end1 = 'f8'):
                     end1 = time.perf_counter()
                 cost2[l+1] += (end1-start1)
                 diff[j,:] = F(x_f)-F(x_c)
             with objmode(start2 = 'f8'):
                 start2 = time.perf_counter()
-            x = mc(dt_list[l],t0,T,n,eps,Q,M,r,boundary=boundary)
+            x = mc(dt_list[l],t0,T,n,eps,Q,M,r,boundary=boundary,rev=rev)
             with objmode(end2 = 'f8'):
                 end2 = time.perf_counter()
             cost1[l] += (end2-start2)
@@ -224,7 +230,7 @@ jit_module(nopython=True,nogil=True)
 
 
 
-def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=1,convergence=True,complexity=True):
+def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=1,convergence=True,complexity=True,rev=False):
     ''''
     filename for logfile should always begin with 'logfile_APS'
 
@@ -261,7 +267,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
 
     if convergence:
         print('Convergence test')
-        b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary=boundary,strategy=strategy)
+        b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary=boundary,strategy=strategy,rev=rev)
         print('Convergence test DONE')
         if save_file:
             for i in range(dt_list.size):
@@ -275,6 +281,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         pg = np.polyfit(range(L1,L),np.log2(np.abs(cost2[L1:L])),1); gamma = pg[0]
         print(f'alpha= {alpha}, beta = {beta}, gamma= {gamma}')
         if save_file:
+            np.savetxt('resultfile'+logfile.name[7:],(dt_list,v,b,var1,var2,cost1,cost2,kur1,cons))
             logfile.write('\n*********************************************************\n')
             logfile.write('\n*** Linear regression estimates of MLMC paramters ***\n')
             logfile.write(f'\n*** regression is done for levels with dt << eps^2 = {eps**2} ***\n')
@@ -294,7 +301,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         data = {}
         for e2 in E2:
             print(f'e2= {e2}')
-            E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=alpha)
+            E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=alpha,rev=rev)
             if save_file:
                 logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {levels} \n")
             data[e2] = {'dt':levels,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
@@ -311,10 +318,9 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
                 df.to_csv(name,index=False)
         if save_file:
             logfile.write('\n')
-            np.savetxt('resultfile'+logfile.name[7:],(dt_list,v,b,var1,var2,cost1,cost2,kur1,cons))
             logfile.close()
 
-    if convergence and False:
+    if convergence:
         plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
         plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
         plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
