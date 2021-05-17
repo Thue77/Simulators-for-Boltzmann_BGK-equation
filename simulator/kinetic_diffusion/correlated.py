@@ -136,9 +136,9 @@ def integral_of_R(R,t_c,t_f,x,v,R_anti):
     This is to calculate exponential numbers for the coarse path.
     t_l,t_l1: numpy arrays of start and end times
     '''
+    I = np.zeros(len(t_c),dtype=np.float64)
     if R_anti is None:
         index = np.argwhere(t_c>t_f).flatten()
-        I = np.zeros(len(t_c),dtype=np.float64)
         sign = np.sign(x+v*(t_c-t_f)-x)
         I[index] = np.zeros(len(index))
         for j in prange(len(index)):

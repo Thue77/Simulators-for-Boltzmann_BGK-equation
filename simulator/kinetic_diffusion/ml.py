@@ -224,7 +224,7 @@ def lin_fit(x,y):
     return np.linalg.inv(normal_matrix).dot(moment_matrix)
 
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100,boundary=None,alpha = None,levels=None):
     '''First do warm-up and select levels with L being the maximum level'''
     if levels is None:
@@ -252,10 +252,27 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100,
             N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
         '''Test bias is below e2/2'''
         if E.size>=4:
+            '''Find jumps in levels. For those jumps, it is not the case that dt_c=2*dt_f
+            Need to account for that when extrapolating values from previous levels.
+            '''
+            jumps_index = np.where(np.diff(levels)!=1)[0]+1
+            jumps = levels[jumps_index]/levels[jumps_index-1]
             if alpha is None:
                 L1 = max(1,np.where(levels<=R(0))[0][0])
                 pa = lin_fit(np.arange(L1,L_num),np.log2(np.abs(E[L1:L_num]))); alpha = -pa[0]
-            test = np.max(np.abs(E[-3:])/2**(np.flip(np.arange(0,3))*alpha))/(2**alpha-1) < np.sqrt(e2/2)
+            # M_t = max(2,round(dt_c/dt_f))
+            if np.max(jumps_index)<E.size-3:
+                test = np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2)
+            else:
+                count=0
+                temp = 0
+                for i in range(L_num-4,L_num):
+                    if i in jumps_index:
+                        temp = max(np.abs(E[i])/(jumps[count]**alpha-1),temp)
+                        count+=1
+                    else:
+                        temp = max(np.abs(E[i])/(2**alpha-1),temp)
+
         else:
             test=False
         # test = max(abs(0.5*E[L_num-2]),abs(E[L_num-1])) < np.sqrt(e2/2)
@@ -296,7 +313,6 @@ def convergence_tests(N,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary):
     if N%cores!=0:
         print('WARNING -  Number of samples is not divisble by 8!\n Please change N for optimal functionality')
     n = round(N/cores)
-
     for l in range(L):
         print(l)
         diff = np.empty((cores,n))
@@ -373,11 +389,11 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         logfile.write("---------------------------------------------------------\n")
 
     if convergence:
+        print('Convergenc test')
         b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary)
-        print('Convergenc test done!')
-        df = pd.DataFrame({'E(F(X^f)-F(X^c))': b,'E(F(X))': v,'var(F(X^f)-F(X^c))': var2,'var(F(X))':var1,'Kurtosis': kur1,'consistency check': cons,'cost(F(X^f)-F(X^c))':cost2,'cost(F(X))':cost1})
-        pd.set_option('max_columns',None)
-        print(df)
+        # df = pd.DataFrame({'E(F(X^f)-F(X^c))': b,'E(F(X))': v,'var(F(X^f)-F(X^c))': var2,'var(F(X))':var1,'Kurtosis': kur1,'consistency check': cons,'cost(F(X^f)-F(X^c))':cost2,'cost(F(X))':cost1})
+        # pd.set_option('max_columns',None)
+        # print(df)
         # print(f'E(F(X^f)-F(X^c)) = {b}')
         # print(f'E(F(X)) = {v}')
         # print(f'var(F(X^f)-F(X^c)) = {var2}')
@@ -388,13 +404,13 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         # print(f'cost(F(X)) = {cost1}')
         # Linear regression to estimate alpha, beta and gamma. Only test for dt << eps^2
         if save_file:
+            np.savetxt('resultfile'+logfile.name[7:],(dt_list,v,b,var1,var2,cost1,cost2,kur1,cons))
             logfile.write('\n*********************************************************\n')
             logfile.write('\n*** Linear regression estimates of MLMC paramters ***\n')
             logfile.write(f'\n*** regression is done for levels with dt << eps^2 = {eps**2} ***\n')
             logfile.write('*********************************************************\n')
         L1 = np.where(dt_list<1/R(0))[0][1]
         pa = np.polyfit(range(L1,L),np.log2(np.abs(b[L1:L])),1); alpha = -pa[0]
-        print(f'my alhpa: {lin_fit(np.arange(L1,L),np.log2(np.abs(b[L1:L])))}')
         pb = np.polyfit(range(L1,L),np.log2(np.abs(var2[L1:L])),1); beta = -pb[0]
         pg = np.polyfit(range(L1,L),np.log2(np.abs(cost2[L1:L])),1); gamma = pg[0]
         print(f'alpha= {alpha}, beta = {beta}, gamma= {gamma}')
@@ -402,24 +418,19 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             logfile.write(f'alpha = {alpha} (exponent for weak convergence) \n')
             logfile.write(f'beta = {beta} (exponent for variance of bias estimate) \n')
             logfile.write(f'gamma = {gamma} (exponent for cost of bias estimate) \n')
-
-    if save_file:
-        for i in range(dt_list.size):
-            logfile.write(f'{i} {dt_list[i]} {b[i]} {v[i]} {var2[i]} {var1[i]} {cost2[i]} {cost1[i]} {kur1[i]} {cons[i]}\n')
-
-
-        logfile.write("\n*********************************************************\n")
-        logfile.write("*** MLMC complexity test ***\n")
-        logfile.write("*********************************************************\n")
-        logfile.write(" e2 value mlmc_cost N_l dt \n")
-        logfile.write("---------------------------------------------------------\n")
-
-
+            for i in range(dt_list.size):
+                logfile.write(f'{i} {dt_list[i]} {b[i]} {v[i]} {var2[i]} {var1[i]} {cost2[i]} {cost1[i]} {kur1[i]} {cons[i]}\n')
 
 
     if complexity:
         ''''Levels are selected based on convergence results to exclude any warm-up
         procedure from the result of the complexity analysis'''
+        if save_file:
+            logfile.write("\n*********************************************************\n")
+            logfile.write("*** MLMC complexity test ***\n")
+            logfile.write("*********************************************************\n")
+            logfile.write(" e2 value mlmc_cost N_l dt \n")
+            logfile.write("---------------------------------------------------------\n")
         if convergence:
             levels = select_levels_data(var1,var2[1:],t0,T)
             print(f'Levels selected: {levels}')
@@ -448,7 +459,6 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                 name = f'resultfile_complexity_{e2}'+logfile.name[7:]
                 df.to_csv(name,index=False)
     if save_file:
-        np.savetxt('resultfile'+logfile.name[7:],(dt_list,v,b,var1,var2,cost1,cost2,kur1,cons))
         logfile.write('\n')
         logfile.close()
 
