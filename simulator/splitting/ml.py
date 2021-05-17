@@ -36,7 +36,7 @@ def rnd1(x, decimals, out):
     return np.round_(x, decimals, out).astype(np.int64)
 
 @njit(nogil=True,parallel=True)
-def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1,rev=False):
+def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1,rev=False,diff=False):
     # levels = ll.copy()
     cores = 8
     n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff)).astype(np.int64))
@@ -51,15 +51,15 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
                     with objmode(start1 = 'f8'):
                         start1 = time.perf_counter()
                     if rev:
-                        x_f,x_c = correlated_ts(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy)
+                        x_f,x_c = correlated_ts(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy,diff=diff)
                     else:
-                        x_f,x_c = correlated(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy)
+                        x_f,x_c = correlated(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy,diff=diff)
                     with objmode(end1 = 'f8'):
                         end1 = time.perf_counter()
                 else:
                     with objmode(start1 = 'f8'):
                         start1 = time.perf_counter()
-                    x_f,x_c = correlated(dt_f,round(levels[0]/dt_f),t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy)
+                    x_f,x_c = correlated(dt_f,round(levels[0]/dt_f),t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy,diff=diff)
                     with objmode(end1 = 'f8'):
                         end1 = time.perf_counter()
                 est_f = F(x_f);est_c=F(x_c)
@@ -69,7 +69,7 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
             else:
                 with objmode(start2 = 'f8'):
                     start2 = time.perf_counter()
-                x = mc(dt_f,t0,T,n[i],eps,Q,M,r,boundary=boundary,rev=rev)
+                x = mc(dt_f,t0,T,n[i],eps,Q,M,r,boundary=boundary,rev=rev,diff=diff)
                 with objmode(end2 = 'f8'):
                     end2 = time.perf_counter()
                 est = F(x)
@@ -86,7 +86,7 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
 
 
 # @njit(nogil=True)
-def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,beta=None,gamma=None,rev=False):
+def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,beta=None,gamma=None,rev=False,diff=False):
     '''
     e2: bound on mean square error
     Q: initial distribution
@@ -116,7 +116,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*8_000_000)
             # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
-            E,SS,N,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy,rev=rev)
+            E,SS,N,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy,rev=rev,diff=diff)
             V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
             N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
@@ -127,7 +127,9 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
             if alpha is None:
                 L1 = max(1,np.where(levels<=eps**2)[0][0])
                 pa = lin_fit(np.arange(L1,L),np.log2(np.abs(E[L1:L]))); alpha = -pa[0]
-            test = np.max(np.abs(E[-3:])/M_t**(np.flip(np.arange(0,3))*alpha))/(M_t**alpha-1) < np.sqrt(e2/2)
+            test = np.max(np.abs(E[-3:]))/(M_t**alpha-1) < np.sqrt(e2/2)
+            # print('Extrapolated values for bias:')
+            # print(np.abs(E[-3:])/M_t**(np.flip(np.arange(0,3))*alpha))
         else:
             test=False
         if test:
@@ -137,8 +139,6 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
         print(L)
         # print(f'New level: {L}')
         N_diff = np.append(N_diff,N_warm).astype(np.int64)
-        # with objmode():
-        #     print(N_diff)
         N = np.append(N,0).astype(np.int64)
         E = np.append(E,0.0); V = np.append(V,0.0); SS = np.append(SS,0.0)
         C = np.append(C,0.0);#np.append(C,M_t**(L-1)+M_t**(L-2)); #
@@ -159,7 +159,7 @@ def lin_fit(x,y):
 
 
 @njit(nogil=True,parallel=True)
-def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False):
+def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False,diff=False):
     '''Calculates values for consistency test for each level given by dt_list'''
     cores = 8 #Controls parrelisation
 
@@ -193,16 +193,16 @@ def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False
                 with objmode(start1 = 'f8'):
                     start1 = time.perf_counter()
                 if rev:
-                    x_f,x_c = correlated_ts(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary)
+                    x_f,x_c = correlated_ts(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary,diff=diff)
                 else:
-                    x_f,x_c = correlated(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary)
+                    x_f,x_c = correlated(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary,diff=diff)
                 with objmode(end1 = 'f8'):
                     end1 = time.perf_counter()
                 cost2[l+1] += (end1-start1)
                 diff[j,:] = F(x_f)-F(x_c)
             with objmode(start2 = 'f8'):
                 start2 = time.perf_counter()
-            x = mc(dt_list[l],t0,T,n,eps,Q,M,r,boundary=boundary,rev=rev)
+            x = mc(dt_list[l],t0,T,n,eps,Q,M,r,boundary=boundary,rev=rev,diff=diff)
             with objmode(end2 = 'f8'):
                 end2 = time.perf_counter()
             cost1[l] += (end2-start2)
@@ -230,7 +230,7 @@ jit_module(nopython=True,nogil=True)
 
 
 
-def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=1,convergence=True,complexity=True,rev=False):
+def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=1,convergence=True,complexity=True,rev=False,diff=False):
     ''''
     filename for logfile should always begin with 'logfile_APS'
 
@@ -245,6 +245,10 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         logfile.write("\n")
         logfile.write("*********************************************************\n")
         logfile.write(f"***Python ml_test for APS method on {now}         ***\n")
+        if rev:
+            logfile.write(f"***    Reverse splitting is used!!      ***\n")
+        if diff:
+            logfile.write(f"***    Altered diffusive coefficient is used!!      ***\n")
         logfile.write("\n")
         logfile.write("*********************************************************\n")
         logfile.write("*** Experiemnt setup  ***\n")
@@ -267,7 +271,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
 
     if convergence:
         print('Convergence test')
-        b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary=boundary,strategy=strategy,rev=rev)
+        b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary=boundary,strategy=strategy,rev=rev,diff=diff)
         print('Convergence test DONE')
         if save_file:
             for i in range(dt_list.size):
@@ -276,7 +280,6 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         # Linear regression to estimate alpha, beta and gamma. Only test for dt << eps^2
         L1 = np.where(dt_list<eps**2/(r(np.array([0]))))[0][1]
         pa = np.polyfit(range(L1,L),np.log2(np.abs(b[L1:L])),1); alpha = -pa[0]
-        print(f'my alhpa: {lin_fit(np.arange(L1,L),np.log2(np.abs(b[L1:L])))}')
         pb = np.polyfit(range(L1,L),np.log2(np.abs(var2[L1:L])),1); beta = -pb[0]
         pg = np.polyfit(range(L1,L),np.log2(np.abs(cost2[L1:L])),1); gamma = pg[0]
         print(f'alpha= {alpha}, beta = {beta}, gamma= {gamma}')
@@ -290,18 +293,18 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
             logfile.write(f'beta = {beta} (exponent for variance of bias estimate) \n')
             logfile.write(f'gamma = {gamma} (exponent for cost of bias estimate) \n')
 
-    if save_file:
-        logfile.write("\n*********************************************************\n")
-        logfile.write("*** MLMC complexity test ***\n")
-        logfile.write("*********************************************************\n")
-        logfile.write(" e2 value mlmc_cost N_l dt \n")
-        logfile.write("---------------------------------------------------------\n")
 
     if complexity:
+        if save_file:
+            logfile.write("\n*********************************************************\n")
+            logfile.write("*** MLMC complexity test ***\n")
+            logfile.write("*********************************************************\n")
+            logfile.write(" e2 value mlmc_cost N_l dt \n")
+            logfile.write("---------------------------------------------------------\n")
         data = {}
         for e2 in E2:
-            print(f'e2= {e2}')
-            E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=alpha,rev=rev)
+            print(f'MSE= {e2}')
+            E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=alpha,rev=rev,diff=diff)
             if save_file:
                 logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {levels} \n")
             data[e2] = {'dt':levels,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
@@ -316,9 +319,9 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
             if save_file:
                 name = f'resultfile_complexity_{e2}'+logfile.name[7:]
                 df.to_csv(name,index=False)
-        if save_file:
-            logfile.write('\n')
-            logfile.close()
+    if save_file:
+        logfile.write('\n')
+        logfile.close()
 
     if convergence:
         plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')

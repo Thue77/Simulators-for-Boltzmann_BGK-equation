@@ -8,15 +8,15 @@ import matplotlib.pyplot as plt
 
 
 # @njit(nogil=True)
-def mc(dt,t0,T,N,eps,Q,M,r,boundary = None,sigma=None,rev=False):
+def mc(dt,t0,T,N,eps,Q,M,r,boundary = None,sigma=None,rev=False,diff=False):
     t = t0
     x,v,_ = Q(N)
     while t<T:
         active = t<T
         z = np.random.normal(0,1,size=N); u = np.random.uniform(0,1,size=N)
-        if rev: x,v,_ = phi_APS_new(x,v,dt,eps,z,u,M,r=r,boundary=boundary)
+        if rev: x,v,_ = phi_APS_new(x,v,dt,eps,z,u,M,r=r,boundary=boundary,diff=diff)
         else:
-            x,v,_ = phi_APS(x,v,dt,eps,z,u,M,r=r,boundary=boundary)
+            x,v,_ = phi_APS(x,v,dt,eps,z,u,M,r=r,boundary=boundary,diff=diff)
         t += dt
     return x
 
@@ -105,12 +105,12 @@ jit_module(nopython=True,nogil=True)
 
 
 @njit(nogil=True,parallel=True)
-def mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=False):
+def mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=False,diff=False):
     cores = 8
     n = round(N/cores)
     x_AP = np.empty((cores,n))
     for i in prange(cores):
-        x_AP[i,:] = mc(dt,t0,T,n,eps,Q,M,r,boundary = boundary,rev=rev)
+        x_AP[i,:] = mc(dt,t0,T,n,eps,Q,M,r,boundary = boundary,rev=rev,diff=diff)
     return x_AP.flatten()
 
 @njit(nogil=True,parallel=True)
@@ -122,7 +122,7 @@ def mc2_par(dt,t0,T,N,eps,Q,M,boundary,r):
         x_std[i,:] = mc_standard(dt,t0,T,n,eps,Q,M,boundary,r)
     return x_std.flatten()
 
-def mc_density_test(dt_list,M_t,t0,T,N,eps,Q,M,r,F,boundary = None, x_std = None, N2 = None,rev=False):
+def mc_density_test(dt_list,M_t,t0,T,N,eps,Q,M,r,F,boundary = None, x_std = None, N2 = None,rev=False,diff=False):
     '''Returns a wasserstein distance and the associated standard deviation'''
     W_out = np.zeros(dt_list.size); err = np.zeros(dt_list.size)
     if x_std is None: x_std = mc2_par((T-t0)/2**20,t0,T,N2,eps,Q,M,boundary,r)
@@ -130,10 +130,7 @@ def mc_density_test(dt_list,M_t,t0,T,N,eps,Q,M,r,F,boundary = None, x_std = None
         W = np.zeros(20)
         print(dt)
         for i in range(20):
-            x_AP = mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=rev)
+            x_AP = mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=rev,diff=diff)
             W[i] = wasserstein_distance(x_AP,x_std)
-            if np.sum(np.isnan(W[i]))>0:
-                print(np.sum(np.isnan(x_std)))
-                print(f'x_AP:{x_AP}')
         W_out[j] = np.mean(W); err[j] = np.std(W)
     return W_out,err

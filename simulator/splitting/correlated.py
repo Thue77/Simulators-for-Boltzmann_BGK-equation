@@ -5,7 +5,7 @@ from numba import njit,jit_module,prange
 import sys
 
 @njit(nogil=True)
-def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
+def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -29,7 +29,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
         for m in range(M_t):
             C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
-            x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary)
+            x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary,diff=diff)
             v_bar_c[C[:,m]] = v_f[C[:,m]]
             if strategy == 3 and first_level:
                 v_bar_all[:,m] = v_f
@@ -38,7 +38,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
         else:
             z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
         u_c = max_np(U,axis=1)**M_t
-        x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary)
+        x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary,diff=diff)
         t += dt_c
     return x_f,x_c
 @njit(nogil=True)
@@ -67,7 +67,7 @@ def improved_corr(dt_f,M_t,eps,x_f,x_c,v_all,v_c,z,r,first_level):
 
 '''My correlation with inspiration from strang splitting'''
 @njit(nogil=True)
-def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
+def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -89,11 +89,11 @@ def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
         for m in range(M_t):
             C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
-            x_f,v_f,v_bar_f = phi_APS_new(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary)
+            x_f,v_f,v_bar_f = phi_APS_new(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary,diff=diff)
             v_bar_all[C[:,m],m] = v_f[C[:,m]]
         v_bar_c,z_c = cor_rv(M_t,Z,C,v_bar_all)
         u_c = max_np(U,axis=1)**M_t
-        x_c,v_c,_ = phi_APS_new(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary)
+        x_c,v_c,_ = phi_APS_new(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary,diff=diff)
         t += dt_c
     return x_f,x_c
 
@@ -159,7 +159,7 @@ def put_np(count,temp,M_t):
 
 
 '''Function to make different plot tests for homogenous version of correlated method'''
-def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False,rev = False):
+def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False,rev = False,diff=False):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -195,10 +195,10 @@ def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False,rev = F
                 if plot:
                     X_f += [x_f]
                     if C[:,m]: C1 += [(t+m*dt_f,x_f)]
-                x_f,v_f,v_bar_f = phi_APS_new(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r)
+                x_f,v_f,v_bar_f = phi_APS_new(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,diff=diff)
                 v_bar_all[C[:,m],m] = v_f[C[:,m]]
             else:
-                x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r)
+                x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,diff=diff)
                 v_bar_c[C[:,m]] = v_f[C[:,m]]#v_bar_f[C[:,m]]
             # print(f'v_last: {v_last}')
             if plot and not rev:
@@ -215,10 +215,10 @@ def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False,rev = F
             if plot:
                 X_c += [x_c]
                 if u_c >=eps**2/(eps**2+dt_c*r(x_c)): C2 += [(t,x_c)]
-            x_c,v_c,_ = phi_APS_new(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c)
+            x_c,v_c,_ = phi_APS_new(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,diff=diff)
         else:
             z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
-            x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c)
+            x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,diff=diff)
         print('---------- Coarse data ----------------')
         print(f'v_f: {v_c},\n v_bar_c: {v_bar_c}  u_c: {u_c},\n C: {u_c>=eps**2/(eps**2+dt_c*r(x_c))}')
         t += dt_c
