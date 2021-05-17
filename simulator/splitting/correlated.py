@@ -1,7 +1,8 @@
-import numpy as np
 from .one_step import phi_APS,phi_APS_new
 import matplotlib.pyplot as plt
+import numpy as np
 from numba import njit,jit_module,prange
+import sys
 
 @njit(nogil=True)
 def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
@@ -89,30 +90,68 @@ def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1):
         for m in range(M_t):
             C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
             x_f,v_f,v_bar_f = phi_APS_new(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary)
-            v_bar_all[C[:,m]] = v_f[C[:,m]]
+            v_bar_all[C[:,m],m] = v_f[C[:,m]]
         v_bar_c,z_c = cor_rv(M_t,Z,C,v_bar_all)
         u_c = max_np(U,axis=1)**M_t
         x_c,v_c,_ = phi_APS_new(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary)
         t += dt_c
     return x_f,x_c
 
-@njit(nogil=True)
+@njit(nogil=True,parallel=True)
 def cor_rv(M_t,Z,C,v_bar_all):
     z = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
     '''Determine influence of each v*'''
     '''The number of 1's in C_a indicate the number of steps that the first velocity
     influences and the number 2's indicate the number of steps that the second
     velocity influences'''
-    C_a = np.cumsum(C,axis=1)
+    C_a = np.zeros_like(v_bar_all)
+    # print(C)
+    n = C.shape[0]
+    for j in prange(n):
+        C_a[j,:] = np.cumsum(C[j,:])
+    # C_a = np.cumsum(C,axis=1)
+    # print(f'C_a= {C_a}')
+
     #number of steps affected by collisions
     steps = np.count_nonzero(C_a>0,axis=1)
-    theta = np.zeros((C_n.size,np.max(C_a)))
-    count = np.zeros((C_n.size,np.max(C_a)))
-    for i in range(M_t):
-        count[:,i] = np.count_nonzero(C_a==i+1,axis=1)
-    theta = count/steps
-    return np.sum(np.sqrt(theta)*v_bar_all,axis=1),z
+    #number of steps that each collision affects. count[0,1]: number of steps affected by second collision for path 0
+    temp = np.zeros_like(v_bar_all).astype(np.int64)
+    # i_c = np.zeros(M_t,dtype=np.int64)
+    for i in prange(M_t):
+        temp[:,i] = np.count_nonzero(C_a==i+1,axis=1)
+        # i_c = np.sum(count[:,0:i])
 
+    #fit index of number of steps affected by collision with the index of the collision
+    # start = np.minimum(M_t-np.sum(temp,axis=1),M_t-1).astype(np.int64)
+    count = np.zeros_like(v_bar_all).astype(np.int64)
+    put_np(count,temp,M_t)
+    # for i in prange(M_t):
+    #     count[range(n),start] = temp[range(n),i]
+    #     start = np.minimum(start+temp[:,i],M_t-1).astype(np.int64)
+
+
+    # print(f'count={count}, steps = {steps}')
+    theta = np.zeros_like(v_bar_all)
+    '''Cannot divide with steps for paths where no collisions occurs'''
+    index = np.where(steps>0)[0]
+    theta[index,:] = (count[index,:].T/steps[index]).T
+    # for i in index:
+    #     index_zero = theta[i,:]==0
+    #     theta[i,index_zero] = 1
+    # print(f'steps: {steps},\n count= {count},\n C_a: {C_a},\n theta: {theta}\n v_bar_all: {v_bar_all}')
+    # print(f'output: {np.sum(np.sqrt(theta)*v_bar_all,axis=1)}')
+
+    return np.sum(np.sqrt(theta)*v_bar_all,axis=1),z
+@njit(nogil=True)
+def put_np(count,temp,M_t):
+    # print(f'temp: {temp}')
+    for i in range(count.shape[0]):
+        start = M_t-np.sum(temp[i,:])
+        for j in range(M_t):
+            if start>=M_t:
+                break
+            count[i,start] = temp[i,j]
+            start = start + temp[i,j]
 
 
 
@@ -120,7 +159,7 @@ def cor_rv(M_t,Z,C,v_bar_all):
 
 
 '''Function to make different plot tests for homogenous version of correlated method'''
-def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
+def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False,rev = False):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -140,38 +179,65 @@ def correlated_test(dt_f,M_t,t,T,eps,N,Q,B,r=1,plot=False,plot_var=False):
         var_f = [0]
         var_c = [0]
     if plot:
-        X_f = [x_f]
-        X_c = [x_c]
-        C1 = [(0.0,np.array([0.0]))]
-        C2 = [(0.0,np.array([0.0]))]
+        X_f = [x_f] if not rev else []
+        X_c = [x_c] if not rev else []
+        C1 = [(0.0,np.array([0.0]))] if not rev else []
+        C2 = [(0.0,np.array([0.0]))] if not rev else []
     while t<T:
+        if rev: v_bar_all = np.zeros((N,M_t))
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
-        C = (U>=eps**2/(eps**2+dt_f*r)) #Indicates if collisions happen
+
+        C = (U>=eps**2/(eps**2+dt_f*r(x_f))) #Indicates if collisions happen
         # print(f'probability = {1-eps**2/(eps**2+dt_f*r)}')
+        print(f'*********************** t = {t}*************************************')
         for m in range(M_t):
-            x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r)
-            v_bar_c[C[:,m]] = v_f[C[:,m]]#v_bar_f[C[:,m]]
+            if rev:
+                if plot:
+                    X_f += [x_f]
+                    if C[:,m]: C1 += [(t+m*dt_f,x_f)]
+                x_f,v_f,v_bar_f = phi_APS_new(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r)
+                v_bar_all[C[:,m],m] = v_f[C[:,m]]
+            else:
+                x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r)
+                v_bar_c[C[:,m]] = v_f[C[:,m]]#v_bar_f[C[:,m]]
             # print(f'v_last: {v_last}')
-            if plot:
+            if plot and not rev:
                 X_f += [x_f]
                 if C[:,m]: C1 += [(t+(m+1)*dt_f,x_f)]
-        z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
+        print('---------- Fine data ----------------')
+        print(f'v_f: {v_f},\n v_bar_all: {v_bar_all},\n C: {C}')
         u_c = max_np(U,axis=1)**M_t
-        x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c)
+        if rev:
+            v_bar_c,z_c = cor_rv(M_t,Z,C,v_bar_all)
+            # print(f'Collisions: {C}')
+            # print(f'v_f = {v_bar_all}, \n v_c = {v_c}')
+            # sys.exit()
+            if plot:
+                X_c += [x_c]
+                if u_c >=eps**2/(eps**2+dt_c*r(x_c)): C2 += [(t,x_c)]
+            x_c,v_c,_ = phi_APS_new(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c)
+        else:
+            z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
+            x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c)
+        print('---------- Coarse data ----------------')
+        print(f'v_f: {v_c},\n v_bar_c: {v_bar_c}  u_c: {u_c},\n C: {u_c>=eps**2/(eps**2+dt_c*r(x_c))}')
         t += dt_c
-        if plot:
+        if plot and not rev:
             X_c += [x_c]
-            if u_c >=eps**2/(eps**2+dt_c*r): C2 += [(t,x_c)]
+            if u_c >=eps**2/(eps**2+dt_c*r(x_c)): C2 += [(t,x_c)]
         if plot_var:
             var_d += [np.var(x_f-x_c)]
             var_f += [np.var(x_f)]
             var_c += [np.var(x_c)]
+    if rev and plot:
+        X_f += [x_f]
+        X_c += [x_c]
     if plot:
-        plt.plot(np.arange(0,T+dt_f,dt_f),X_f,'.-')
-        plt.plot(np.arange(0,T+dt_c,dt_c),X_c,'.-')
+        plt.plot(np.arange(0,T+dt_f,dt_f),X_f,'.-') if not rev else plt.plot(np.arange(0,T+dt_f,dt_f),X_f,'.-')
+        plt.plot(np.arange(0,T+dt_c,dt_c),X_c,'.-') if not rev else plt.plot(np.arange(0,T+dt_c,dt_c),X_c,'.-')
         plt.plot([t for t,_ in C1],[x[0] for _,x in C1],'x',color='blue')
         plt.plot([t for t,_ in C2],[x[0] for _,x in C2],'x',color='red')
-        print(f'C1: {C1} \n C2: {C2}')
+        # print(f'C1: {C1} \n C2: {C2}')
         plt.grid(color='black', lw=1.0)
         plt.show()
     if plot_var:
