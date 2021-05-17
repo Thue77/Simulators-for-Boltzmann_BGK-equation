@@ -91,7 +91,7 @@ M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:C
 
 @njit(nogil=True,parallel=True)
 def mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary):
-    cores = 8
+    cores = 4
     n = round(N/cores)
     x_KD = np.empty((cores,n))
     for i in prange(cores):
