@@ -135,6 +135,9 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
         if test:
             break
         L += 1;
+        if L==18:
+            print('WARNING: maximum capacity reached!')
+            break
         print('Level added')
         print(L)
         # print(f'New level: {L}')
@@ -185,7 +188,7 @@ def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False
     # all_diff = np.zeros((N,L))
 
     for l in range(L):
-        diff = np.empty((cores,n))
+        diff_vec = np.empty((cores,n))
         val = np.empty((cores,n))
         for j in prange(cores):
             if l<L-1:
@@ -199,7 +202,7 @@ def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False
                 with objmode(end1 = 'f8'):
                     end1 = time.perf_counter()
                 cost2[l+1] += (end1-start1)
-                diff[j,:] = F(x_f)-F(x_c)
+                diff_vec[j,:] = F(x_f)-F(x_c)
             with objmode(start2 = 'f8'):
                 start2 = time.perf_counter()
             x = mc(dt_list[l],t0,T,n,eps,Q,M,r,boundary=boundary,rev=rev,diff=diff)
@@ -213,10 +216,10 @@ def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False
         var1[l]  = v2[l] - v[l]**2
         if l<L-1:
             # all_diff[:,l+1] = diff.flatten()
-            b[l+1] = np.mean(diff)
-            b2[l+1] = np.mean(diff**2)
-            b3[l+1] = np.mean(diff**3)
-            b4[l+1] = np.mean(diff**4)
+            b[l+1] = np.mean(diff_vec)
+            b2[l+1] = np.mean(diff_vec**2)
+            b3[l+1] = np.mean(diff_vec**3)
+            b4[l+1] = np.mean(diff_vec**4)
             var2[l+1] = b2[l+1]-b[l+1]**2
             cost2[l+1] = cost2[l+1]/N
             # cons[l+1] = np.abs(b[l+1]+v[l]-v[l+1])/(3*(np.sqrt(var2[l+1])+ np.sqrt(var1[l])+np.sqrt(var1[l+1]))/np.sqrt(N))
@@ -323,7 +326,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         logfile.write('\n')
         logfile.close()
 
-    if convergence:
+    if convergence and False:
         plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
         plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
         plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')

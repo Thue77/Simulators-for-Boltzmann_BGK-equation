@@ -66,6 +66,9 @@ if not args.correlated_time_test and not args.correlation_test and not args.dens
 if uf and args.save_file:
     sys.exit('ERROR: Cannot both use existing file and save result')
 
+if args.save_file:
+    print(f'files are saved in {args.folder}')
+
 #Inintial distribution of position and velocity
 def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     '''Initial distribution for (x,v)'''
@@ -447,7 +450,7 @@ if __name__ == '__main__':
             if not rev and not diff:
                 (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
             else:
-                (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
+                (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev={rev}_diff={diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
             plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
             plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
             plt.plot(dt_list[1:],np.abs(bias[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
@@ -472,7 +475,6 @@ if __name__ == '__main__':
                 print(dfs[e2])
 
             plt.show()
-
         else:
             if N is None:
                 N = 120_000
@@ -489,7 +491,7 @@ if __name__ == '__main__':
                     logfile = open(f'logfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,rev=False,complexity=True,rev=rev,diff=diff)
+            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,rev=rev,diff=diff)
     if ml_test_KD:
         E2=0.01/2**np.arange(0,13)
         if uf:
@@ -582,7 +584,7 @@ if __name__ == '__main__':
                 W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True)
                 print(f'APS with reverse one-step method is done. Time: {time.time()-start}')
             if args.save_file and not uf:
-                with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','w') as file:
+                with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
                     np.savetxt(file,(W,err))
             plt.errorbar(dt_list,W,err,label='Error for reverse APS')
             if uf:
@@ -591,7 +593,7 @@ if __name__ == '__main__':
             else:
                 # pass
                 W,err = KDMC_density_test(dt_list,Q,t0,T,N/10,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
-            if args.save_file and not uf and False:
+            if args.save_file and not uf:
                 with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
                     np.savetxt(file,(W,err))
             plt.errorbar(dt_list,W,err,label='Error for KD')
@@ -602,6 +604,9 @@ if __name__ == '__main__':
                 start = time.time()
                 W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=False,diff=True)
                 print(f'APS with reverse one-step method is done. Time: {time.time()-start}')
+            if args.save_file and not uf:
+                with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
+                    np.savetxt(file,(W,err))
             plt.errorbar(dt_list,W,err,label='Error for APS with aletered diffusive coefficient')
             if uf:
                 W = data[8]
@@ -609,7 +614,10 @@ if __name__ == '__main__':
             else:
                 start = time.time()
                 W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,diff=True)
-                print(f'APS with reverse one-step method is done. Time: {time.time()-start}')
+                print(f'APS with reverse one-step method and altered diffusive coeficient is done. Time: {time.time()-start}')
+            if args.save_file and not uf:
+                with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
+                    np.savetxt(file,(W,err))
             plt.errorbar(dt_list,W,err,label='Error for reverse APS with aletered diffusive coefficient')
             plt.xscale('log')
             plt.yscale('log')

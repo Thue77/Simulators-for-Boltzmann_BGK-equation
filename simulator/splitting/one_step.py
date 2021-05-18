@@ -5,7 +5,7 @@ import sys
 
 def psi_t(x,v,dt,eps,z,r,diff=False):
     if diff:
-        dt/(eps**2+dt*r(x))#
+        D = dt/(eps**2+dt*r(x))#
     else:
         D = v**2*dt/(eps**2+dt*r(x))#
     A = eps/(eps**2+dt*r(x))*v
