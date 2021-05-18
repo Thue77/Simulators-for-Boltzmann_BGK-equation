@@ -305,23 +305,28 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
             logfile.write(" e2 value mlmc_cost N_l dt \n")
             logfile.write("---------------------------------------------------------\n")
         data = {}
+        pd.set_option('max_columns',None)
         for e2 in E2:
             print(f'MSE= {e2}')
             E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=alpha,rev=rev,diff=diff)
-            if save_file:
-                logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {levels} \n")
             data[e2] = {'dt':levels,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
-
-        pd.set_option('max_columns',None)
-        for e2,d in data.items():
-            print(f'MSE: {e2}')
-            df = pd.DataFrame(d)
-            df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in d['E']])],'V_l':' ','V[E]':[np.sum([v for v in d['V[E]']])],'C_l':[np.sum([c for c in d['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(d['N_l'],d['C_l']))]}))
-            # df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':' ','V_l':' ','C_l':' ','N_l C_l':' '}))
+            df = pd.DataFrame(data[e2])
+            df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in data[e2]['E']])],'V_l':' ','V[E]':[np.sum([v for v in data[e2]['V[E]']])],'C_l':[np.sum([c for c in data[e2]['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(data[e2]['N_l'],data[e2]['C_l']))]}))
             print(df)
             if save_file:
                 name = f'resultfile_complexity_{e2}'+logfile.name[7:]
                 df.to_csv(name,index=False)
+                logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {levels} \n")
+
+        # for e2,d in data.items():
+        #     print(f'MSE: {e2}')
+        #     df = pd.DataFrame(d)
+        #     df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in d['E']])],'V_l':' ','V[E]':[np.sum([v for v in d['V[E]']])],'C_l':[np.sum([c for c in d['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(d['N_l'],d['C_l']))]}))
+        #     # df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':' ','V_l':' ','C_l':' ','N_l C_l':' '}))
+        #     print(df)
+        #     if save_file:
+        #         name = f'resultfile_complexity_{e2}'+logfile.name[7:]
+        #         df.to_csv(name,index=False)
     if save_file:
         logfile.write('\n')
         logfile.close()
