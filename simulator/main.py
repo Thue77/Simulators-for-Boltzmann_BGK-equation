@@ -95,6 +95,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v_norm = v/sigma(x)
     elif density_est and post_collisional:
         x,v,v_norm = test3(N)
+        v = v/epsilon
     elif ml_test_KD or ml_test_APS or density_est:
         x,v,v_norm = test2(N)
         v = v/epsilon
@@ -537,13 +538,22 @@ if __name__ == '__main__':
     if goldstein_taylor:
         if N is None:
             N=120_000;
-        N0=40; M_t = 2; t0=0;T=0.5
+        N0=40; M_t = 2; t0=0;T=5
         dt_list = T/2**np.arange(0,17,1); E2=np.array([0.01,0.0001,1e-6],dtype=np.float64)
-        if args.no_file:
-            logfile=None
-        else:
+        if args.save_file:
             logfile = open(f'logfile_APS_Goldstein_Taylor_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
-        APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile)
+        else:
+            logfile=None
+        # APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False)
+        x_std = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
+        W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std)
+        plt.errorbar(dt_list,W,err,label='Error APS GT dist')
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.xlabel(r'$\Delta t$')
+        plt.ylabel('Wasserstein distance')
+        plt.legend()
+        plt.show()
     if density_est:
         if N is None:
             N = 120_000
@@ -653,6 +663,7 @@ if __name__ == '__main__':
                 W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,diff=True)
                 print(f'APS with reverse one-step method and altered diffusive coeficient is done. Time: {time.time()-start}')
             if args.save_file:
+                if post_collisional:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','a') as file:
                         np.savetxt(file,(W,err))
                 else:

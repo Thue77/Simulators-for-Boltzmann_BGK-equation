@@ -145,7 +145,7 @@ def test3(N=10_000):
         X[index_accept] = x[I_n];V[index_accept] = v[I_n]
         I[index_accept] = 0
         n = np.sum(I,dtype=np.int64)
-    return X,V,V
+    return X,V,V.copy()
 
 def plot_exact():
     x_axis = np.arange(0,1,1e-2)
