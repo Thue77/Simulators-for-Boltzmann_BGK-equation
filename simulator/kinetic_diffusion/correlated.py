@@ -3,7 +3,7 @@ import math
 import sys
 from .one_step import phi_KD
 from typing import Callable,Tuple
-# from numba import jit_module,njit
+from numba import jit_module,njit
 from numba import prange
 
 '''Method for correlating paths of different levels in the Multilevel Monte Carlo
