@@ -1,7 +1,8 @@
 from .one_step import phi_APS,phi_APS_new
 import matplotlib.pyplot as plt
 import numpy as np
-from numba import njit,jit_module,prange
+from numba import njit,jit_module
+from numba import prange
 import sys
 
 @njit(nogil=True)

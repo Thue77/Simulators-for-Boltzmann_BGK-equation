@@ -2,12 +2,13 @@ from .one_step import phi_APS,phi_standard,phi_APS_new
 from .correlated import correlated
 from .AddPaths import delta,x_hat,Sfunc
 import numpy as np
-from numba import njit,jit_module,prange
+from numba import njit,jit_module
+from numba import prange
 from scipy.stats import wasserstein_distance
 import matplotlib.pyplot as plt
 
 
-# @njit(nogil=True)
+@njit(nogil=True)
 def mc(dt,t0,T,N,eps,Q,M,r,boundary = None,sigma=None,rev=False,diff=False):
     t = t0
     x,v,_ = Q(N)
@@ -78,7 +79,7 @@ def mc_adaptive(dt0,M_t,e2,N0,t0,T,N,eps,Q,M,r,F,boundary = None,density=False):
 
 
 
-# @njit(nogil=True)
+@njit(nogil=True)
 def mc_standard(dt,t0,T,N,eps,Q,M,boundary,r):
     t = t0
     x,v,_ = Q(N)

@@ -3,7 +3,8 @@ from .correlated import correlated
 from .mc import KDMC
 import time
 from .AddPaths import delta,x_hat,Sfunc
-from numba import njit,jit_module,prange,objmode
+from numba import njit,jit_module
+from numba import prange,objmode
 from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -224,7 +225,7 @@ def lin_fit(x,y):
     return np.linalg.inv(normal_matrix).dot(moment_matrix)
 
 
-# @njit(nogil=True)
+@njit(nogil=True)
 def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100,boundary=None,alpha = None,levels=None):
     '''First do warm-up and select levels with L being the maximum level'''
     if levels is None:

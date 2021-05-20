@@ -1,7 +1,8 @@
 import numpy as np
 from .one_step import phi_KD,__psi_k
 from typing import Callable,Tuple
-from numba import njit,prange
+from numba import njit
+from numba import prange
 from scipy.stats import wasserstein_distance
 
 '''Standard Monte Carlo method'''

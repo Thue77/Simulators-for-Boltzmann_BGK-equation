@@ -1,5 +1,6 @@
 import numpy as np
-from numba import njit,jit_module,prange
+from numba import njit,jit_module
+from numba import prange
 import sys
 
 
