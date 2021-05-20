@@ -4,7 +4,8 @@ from .mc import mc
 from .AddPaths import delta,x_hat,Sfunc
 import time
 import pandas as pd
-from numba import njit,jit_module,prange,objmode
+from numba import njit,jit_module
+from numba import prange,objmode
 import sys
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -24,8 +25,9 @@ def select_levels(t0,T,M_t,eps,r,F,strategy=1,cold_start=True,N=100,boundary=Non
         N_diff=np.ones(4,dtype=np.int64)*N
         SS_out = np.zeros(4);C_out = np.zeros(4); E_out=np.zeros(4)
     else:
-        dt_1 = np.minimum((eps/10)**2,0.025)
-        levels = np.array([float(T-t0),dt_1,dt_1/M_t])
+        dt_1 = np.minimum(eps**2/r(np.array([0])),T-t0)
+        levels = np.append(np.array([T-t0]),dt_1/M_t**np.arange(0,3))
+        # levels = np.array([float(T-t0),dt_1,dt_1/M_t])
         N_out=np.zeros(3,dtype=np.int64)
         N_diff=np.ones(3,dtype=np.int64)*N
         SS_out = np.zeros(3);C_out = np.zeros(3); E_out=np.zeros(3)
@@ -85,7 +87,7 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
     return E,SS,N,C
 
 
-# @njit(nogil=True)
+@njit(nogil=True)
 def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,beta=None,gamma=None,rev=False,diff=False):
     '''
     e2: bound on mean square error
