@@ -116,7 +116,7 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v_norm = v.copy()
     elif density_est and post_collisional:
         # x,v,v_norm = test3(N)
-        x = np.ones(N); v = np.random.normal(0,1,size=N)
+        x = np.ones(N); v_norm = np.random.normal(0,1,size=N)
         v = v_norm*epsilon
     elif ml_test_KD or ml_test_APS or density_est:
         x,v,v_norm = test2(N)
