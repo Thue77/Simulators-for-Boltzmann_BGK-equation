@@ -580,7 +580,7 @@ if __name__ == '__main__':
             x_KD=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
             dist = pd.DataFrame(data={'x':x_KD,'Method':['KD' for _ in range(N)]})
             print('Done with KMC')
-            x_AP = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r,v_ms=v_ms)
+            x_AP = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
             dist = dist.append(pd.DataFrame(data={'x':x_AP,'Method':['Splitting' for _ in range(N)]}))
             print(wasserstein_distance(x_AP,x_KD))
             sns.kdeplot(data=dist, x="x",hue='Method',cut=0,common_norm=False)
@@ -615,7 +615,7 @@ if __name__ == '__main__':
             else:
                 print('Done with exact')
                 print(f'{N/10} paths used to estimate density with APSMC and KDMC')
-                W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std)
+                W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
             if args.save_file:
                 if post_collisional:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','w') as file:
@@ -658,7 +658,7 @@ if __name__ == '__main__':
                 err = data[7]
             else:
                 start = time.time()
-                W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=False,diff=True)
+                W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=False,diff=True,v_ms=v_ms)
                 print(f'APS with altered diffusive coefficient is done. Time: {time.time()-start}')
             if args.save_file:
                 if post_collisional:
