@@ -101,7 +101,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v = v_norm.copy()#/epsilon
     elif ml_test_KD or ml_test_APS or density_est:
         x,v,v_norm = test2(N)
-        v = v/epsilon
+        v = v#/epsilon
     return x,v,v_norm
 
 def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
@@ -120,6 +120,7 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v = v_norm*epsilon
     elif ml_test_KD or ml_test_APS or density_est:
         x,v,v_norm = test2(N)
+        v=v_norm*epsilon
     elif correlation_test or correlated_time_test:
         x = np.ones(N); v = np.random.normal(0,1,size=N)
         v_norm = v.copy()
@@ -542,12 +543,12 @@ if __name__ == '__main__':
         else:
             if N is None:
                 N = 120_000
-            N0=16; T=1; dt_list = T/2**np.arange(0,17,1) if a==0 else T/2**np.arange(0,17,1); E2=0.01/2**np.arange(0,13); t0=0
+            N0=16; T=1; dt_list = T/2**np.arange(0,17,1); E2=0.01/2**np.arange(0,13); t0=0
             if args.save_file:
                 logfile = open(f'logfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary)
+            KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)
     if goldstein_taylor:
         if N is None:
             N=120_000;
@@ -640,8 +641,8 @@ if __name__ == '__main__':
             #             np.savetxt(file,(W,err))
             # plt.errorbar(dt_list,W,err,label='Error for reverse APS')
             if uf:
-                W = data[4]
-                err = data[5]
+                W = data[2]
+                err = data[3]
             else:
                 # pass
                 W,err = KDMC_density_test(dt_list,Q,t0,T,N/10,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
@@ -654,8 +655,8 @@ if __name__ == '__main__':
                         np.savetxt(file,(W,err))
             plt.errorbar(dt_list,W,err,label='Error for KD')
             if uf:
-                W = data[6]
-                err = data[7]
+                W = data[4]
+                err = data[5]
             else:
                 start = time.time()
                 W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=False,diff=True,v_ms=v_ms)
