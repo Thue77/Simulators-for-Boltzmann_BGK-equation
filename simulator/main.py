@@ -46,7 +46,7 @@ parser.add_argument('--folder',help='give name of folder to save files in the fo
 parser.add_argument('-rev','--reverse_splitting',action='store_true',help='Variable for ML-testing with splitting approach. Indicates if reversed splitting should be used.')
 parser.add_argument('-diff','--altered_diff_coef',action='store_true',help='Variable for ML-testing with splitting approach. Indicates if altered diffusive coefficient should be used.')
 parser.add_argument('-pc','--post_collisional',action='store_true',help='If given, the initial velocity distribution corresponds to the post-collisional distribution')
-
+parser.add_argument('-sep','--separator',type=str,help='File path separator used in paths on your system. Default is for Windows 10')
 
 
 args = parser.parse_args()
@@ -98,7 +98,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         x = np.ones(N)
         # print('Her')
         v_norm = np.random.normal(0,1,size=N)
-        v = v_norm/epsilon
+        v = v_norm.copy()#/epsilon
     elif ml_test_KD or ml_test_APS or density_est:
         x,v,v_norm = test2(N)
         v = v/epsilon
@@ -117,7 +117,7 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     elif density_est and post_collisional:
         # x,v,v_norm = test3(N)
         x = np.ones(N); v = np.random.normal(0,1,size=N)
-        v_norm = v.copy()
+        v = v_norm*epsilon
     elif ml_test_KD or ml_test_APS or density_est:
         x,v,v_norm = test2(N)
     elif correlation_test or correlated_time_test:
@@ -391,7 +391,7 @@ def mu(x):
 
 def sigma(x):
     if ml_test_KD or ml_test_APS or density_est or correlated_time_test:
-        return 1/epsilon
+        return 1#/epsilon
     elif level_selection:
         return 1
     elif radiative_transport:
@@ -406,7 +406,7 @@ def M(x):
         v_norm = v_next/sigma(x)
     elif ml_test_KD or ml_test_APS or density_est:
         v_norm = np.random.normal(0,1,size=x.size)
-        v_next = v_norm#/epsilon
+        v_next = v_norm.copy()#/epsilon
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = mu(x) + sigma(x)*v_norm
@@ -443,7 +443,7 @@ def boundary_periodic(x):
 def boundary(x):
     return x
 
-v_ms = epsilon if density_est or ml_test_APS else 1
+v_ms = epsilon**2 if density_est or ml_test_APS else 1
 
 '''Function related to the quantity of interest, E(F(X,V))'''
 def F(x,v=0):
