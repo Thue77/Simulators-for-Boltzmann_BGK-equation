@@ -390,7 +390,7 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         logfile.write("---------------------------------------------------------\n")
 
     if convergence:
-        print('Convergenc test')
+        print('Convergence test')
         b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary)
         # df = pd.DataFrame({'E(F(X^f)-F(X^c))': b,'E(F(X))': v,'var(F(X^f)-F(X^c))': var2,'var(F(X))':var1,'Kurtosis': kur1,'consistency check': cons,'cost(F(X^f)-F(X^c))':cost2,'cost(F(X))':cost1})
         # pd.set_option('max_columns',None)

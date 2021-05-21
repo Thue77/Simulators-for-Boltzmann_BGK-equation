@@ -93,7 +93,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
         # v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
         v_norm = v/sigma(x)
-    elif density_est and post_collisional:
+    elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional):
         # x,v,v_norm = test3(N)
         x = np.ones(N)
         # print('Her')
@@ -114,7 +114,7 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v =  (U <= 0.5).astype(np.float64) - (U > 0.5).astype(np.float64)
         x = np.zeros(N)
         v_norm = v.copy()
-    elif density_est and post_collisional:
+    elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional):
         # x,v,v_norm = test3(N)
         x = np.ones(N); v_norm = np.random.normal(0,1,size=N)
         v = v_norm*epsilon
@@ -501,7 +501,7 @@ if __name__ == '__main__':
         else:
             if N is None:
                 N = 120_000
-            N0=16; T=1; dt_list = T/2**np.arange(0,17,1) if a==0 else T/2**np.arange(0,20,1); t0=0; M_t=2
+            N0=16; T=1; dt_list = T/2**np.arange(0,17,1); t0=0; M_t=2
             if args.save_file:
                 '''file names:
                 "logfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt"
@@ -515,7 +515,7 @@ if __name__ == '__main__':
                     logfile = open(f'logfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,rev=rev,diff=diff,v_ms=v_ms)
+            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False,rev=rev,diff=diff,v_ms=v_ms)
     if ml_test_KD:
         E2=0.01/2**np.arange(0,13)
         if uf:

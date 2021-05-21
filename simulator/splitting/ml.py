@@ -190,6 +190,7 @@ def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False
     # all_diff = np.zeros((N,L))
 
     for l in range(L):
+        print(l)
         diff_vec = np.empty((cores,n))
         val = np.empty((cores,n))
         for j in prange(cores):
