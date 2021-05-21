@@ -94,8 +94,11 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
         v_norm = v/sigma(x)
     elif density_est and post_collisional:
-        x,v,v_norm = test3(N)
-        v = v/epsilon
+        # x,v,v_norm = test3(N)
+        x = np.ones(N)
+        # print('Her')
+        v_norm = np.random.normal(0,1,size=N)
+        v = v_norm/epsilon
     elif ml_test_KD or ml_test_APS or density_est:
         x,v,v_norm = test2(N)
         v = v/epsilon
@@ -112,7 +115,9 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         x = np.zeros(N)
         v_norm = v.copy()
     elif density_est and post_collisional:
-        x,v,v_norm = test3(N)
+        # x,v,v_norm = test3(N)
+        x = np.ones(N); v = np.random.normal(0,1,size=N)
+        v_norm = v.copy()
     elif ml_test_KD or ml_test_APS or density_est:
         x,v,v_norm = test2(N)
     elif correlation_test or correlated_time_test:
@@ -152,7 +157,7 @@ def R_anti(x):
     if radiative_transport or correlated_time_test:
         return x/(epsilon**2)
     elif level_selection:
-        return (-b*a/2*x**2 + (a+1)*b*x)*(x<=1) + (b*a/2*x**2+(1-a)*b*x)*(x>1)
+        return (-b*a/2*x**2+b*(a+1)*x)*(x<=1) + (-b*a/2+b*(a+1) -b*a/2-b*(1-a)+b*a/2*x**2+b*(1-a)*x)*(x>1)#(-b*a/2*x**2 + (a+1)*b*x)*(x<=1) + (b*a/2*x**2+(1-a)*b*x)*(x>1)
     elif ml_test_KD or ml_test_APS or density_est:
         return 1/epsilon**2*((-a*(x**2/2-0.5*x)+b*x)*(x<=0.5) + ((-a*(0.5**2/2-0.5*0.5)+b*0.5) + (a*(x**2/2-0.5*x)+b*x) - (a*(0.5**2/2-0.5*0.5)+b*0.5))*(x>0.5))
 
@@ -161,7 +166,7 @@ def R_anti(x):
 def SC(x,v,e):
     if radiative_transport or a==0 or correlated_time_test:
         dtau = 1/R(x)*e
-    elif level_selection:# or density_est or ml_test_APS or ml_test_KD:
+    elif level_selection and False:# or density_est or ml_test_APS or ml_test_KD:
         '''The background is piece wise linear and it is necessary to identify
             particles that might move accross different pieces, e.g. if
             x>1 and v<0 then the particle might move below 1 where the collision
@@ -218,7 +223,7 @@ def SC(x,v,e):
             e_local[index_new] = e_local[index_new]-I[index_new_domain]/np.abs(v[index_new])
             '''Update x to equal the value of the boundary that it is crossing'''
             x_new[index_new] = boundaries[bins[index_new] + (direction[index_new]<0)]
-    elif ml_test_KD or ml_test_APS or density_est:
+    elif ml_test_KD or ml_test_APS or density_est or level_selection:
         if a==0:
             dtau = 1/R(x)*e
         else:
@@ -341,7 +346,7 @@ def SC(x,v,e):
 
 @njit(nogil=True,parallel=True)
 def roots(x,v,e):
-    if density_est or ml_test_APS or ml_test_KD:
+    if density_est or ml_test_APS or ml_test_KD or level_selection:
         alpha = -a/epsilon**2*(x<=0.5) + a/epsilon**2*(x>0.5)
         beta = (b+a/2)/epsilon**2*(x<=0.5) + (b-a/2)/epsilon**2*(x>0.5)
         pc = -e*v; pb = alpha*v*x+beta*v; pa = alpha/2*v**2
@@ -401,7 +406,7 @@ def M(x):
         v_norm = v_next/sigma(x)
     elif ml_test_KD or ml_test_APS or density_est:
         v_norm = np.random.normal(0,1,size=x.size)
-        v_next = v_norm/epsilon
+        v_next = v_norm#/epsilon
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = mu(x) + sigma(x)*v_norm
@@ -420,7 +425,7 @@ def M_nu(x):
         v_norm = v_next.copy()
     elif ml_test_KD or ml_test_APS or density_est:
         v_norm = np.random.normal(0,1,size=x.size)
-        v_next = v_norm.copy()
+        v_next = v_norm*epsilon
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = v_norm.copy()
@@ -437,6 +442,8 @@ def boundary_periodic(x):
 
 def boundary(x):
     return x
+
+v_ms = epsilon if density_est or ml_test_APS else 1
 
 '''Function related to the quantity of interest, E(F(X,V))'''
 def F(x,v=0):
@@ -476,13 +483,13 @@ if __name__ == '__main__':
             plt.plot(range(1,dt_list.size),cons[1:],':')
             plt.title(f'Plot check of consistency')
 
-            dfs = {}
-            for e2 in E2:
-                if not rev and not diff:
-                    dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
-                else:
-                    dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
-                print(dfs[e2])
+            # dfs = {}
+            # for e2 in E2:
+            #     if not rev and not diff:
+            #         dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            #     else:
+            #         dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            #     print(dfs[e2])
 
             plt.show()
         else:
@@ -492,8 +499,9 @@ if __name__ == '__main__':
             if args.save_file:
                 '''file names:
                 "logfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt"
-                "logfile_APS_rev_for_a={a}_b={b}_epsilon={epsilon}.txt"
-                "logfile_APS_diff_for_a={a}_b={b}_epsilon={epsilon}.txt"
+                "logfile_APS_rev_True_diff_False_for_a={a}_b={b}_epsilon={epsilon}.txt"
+                "logfile_APS_rev_False_diff_True_for_a={a}_b={b}_epsilon={epsilon}.txt"
+                "logfile_APS_rev_True_diff_True_for_a={a}_b={b}_epsilon={epsilon}.txt"
                 '''
                 if not rev and not diff:
                     logfile = open(f'logfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
@@ -501,7 +509,7 @@ if __name__ == '__main__':
                     logfile = open(f'logfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,rev=rev,diff=diff)
+            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,rev=rev,diff=diff,v_ms=v_ms)
     if ml_test_KD:
         E2=0.01/2**np.arange(0,13)
         if uf:
@@ -567,7 +575,7 @@ if __name__ == '__main__':
             x_KD=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
             dist = pd.DataFrame(data={'x':x_KD,'Method':['KD' for _ in range(N)]})
             print('Done with KMC')
-            x_AP = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
+            x_AP = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r,v_ms=v_ms)
             dist = dist.append(pd.DataFrame(data={'x':x_AP,'Method':['Splitting' for _ in range(N)]}))
             print(wasserstein_distance(x_AP,x_KD))
             sns.kdeplot(data=dist, x="x",hue='Method',cut=0,common_norm=False)
@@ -611,21 +619,21 @@ if __name__ == '__main__':
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','w') as file:
                         np.savetxt(file,(W,err))
             plt.errorbar(dt_list,W,err,label='Error for APS')
-            if uf:
-                W = data[2]
-                err = data[3]
-            else:
-                start = time.time()
-                W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True)
-                print(f'APS with reverse one-step method is done. Time: {time.time()-start}')
-            if args.save_file:
-                if post_collisional:
-                    with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','a') as file:
-                        np.savetxt(file,(W,err))
-                else:
-                    with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
-                        np.savetxt(file,(W,err))
-            plt.errorbar(dt_list,W,err,label='Error for reverse APS')
+            # if uf:
+            #     W = data[2]
+            #     err = data[3]
+            # else:
+            #     start = time.time()
+            #     W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True)
+            #     print(f'APS with reverse one-step method is done. Time: {time.time()-start}')
+            # if args.save_file:
+            #     if post_collisional:
+            #         with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','a') as file:
+            #             np.savetxt(file,(W,err))
+            #     else:
+            #         with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
+            #             np.savetxt(file,(W,err))
+            # plt.errorbar(dt_list,W,err,label='Error for reverse APS')
             if uf:
                 W = data[4]
                 err = data[5]
@@ -655,21 +663,21 @@ if __name__ == '__main__':
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
                         np.savetxt(file,(W,err))
             plt.errorbar(dt_list,W,err,label='Error for APS with aletered diffusive coefficient')
-            if uf:
-                W = data[8]
-                err = data[9]
-            else:
-                start = time.time()
-                W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,diff=True)
-                print(f'APS with reverse one-step method and altered diffusive coeficient is done. Time: {time.time()-start}')
-            if args.save_file:
-                if post_collisional:
-                    with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','a') as file:
-                        np.savetxt(file,(W,err))
-                else:
-                    with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
-                        np.savetxt(file,(W,err))
-            plt.errorbar(dt_list,W,err,label='Error for reverse APS with aletered diffusive coefficient')
+            # if uf:
+            #     W = data[8]
+            #     err = data[9]
+            # else:
+            #     start = time.time()
+            #     W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,diff=True)
+            #     print(f'APS with reverse one-step method and altered diffusive coeficient is done. Time: {time.time()-start}')
+            # if args.save_file:
+            #     if post_collisional:
+            #         with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','a') as file:
+            #             np.savetxt(file,(W,err))
+            #     else:
+            #         with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
+            #             np.savetxt(file,(W,err))
+            # plt.errorbar(dt_list,W,err,label='Error for reverse APS with aletered diffusive coefficient')
             plt.xscale('log')
             plt.yscale('log')
             plt.xlabel(r'$\Delta t$')
@@ -747,3 +755,36 @@ if __name__ == '__main__':
         plt.ylabel('Speed-up ratio')
         plt.legend()
         plt.show()
+    if level_selection:
+        E2=0.01/2**np.arange(0,13)
+        if uf:
+            (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_KD_level_selection_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
+            plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
+            plt.plot(dt_list[1:],np.abs(bias[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
+            plt.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
+            plt.title(f'Plot of variance and bias')
+            plt.xscale('log')
+            plt.yscale('log')
+            plt.legend()
+            plt.figure()
+            plt.plot(range(1,dt_list.size),kur1[1:],':')
+            plt.title(f'Plot of kurtosis')
+            plt.figure()
+            plt.plot(range(1,dt_list.size),cons[1:],':')
+            plt.title(f'Plot check of consistency')
+            # dfs = {}
+            # for e2 in E2:
+            #     dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            #     print(dfs[e2])
+            plt.show()
+
+        else:
+            if N is None:
+                N = 120_000
+            N0=16; T=1; dt_list = T/2**np.arange(0,17,1) if a==0 else T/2**np.arange(0,17,1); E2=0.01/2**np.arange(0,13); t0=0
+            if args.save_file:
+                logfile = open(f'logfile_KD_level_selection_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
+            else:
+                logfile=None
+            KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)

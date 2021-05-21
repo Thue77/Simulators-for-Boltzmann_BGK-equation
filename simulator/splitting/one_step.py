@@ -4,35 +4,36 @@ from numba import prange
 import sys
 
 
-def psi_t(x,v,dt,eps,z,r,diff=False):
+def psi_t(x,v,dt,eps,z,r,diff=False,v_ms=1):
+    '''v_ms: <nu^2>'''
     if diff:
-        D = dt/(eps**2+dt*r(x))#
+        D = v_ms**2*dt/(eps**2+dt*r(x))#
     else:
         D = v**2*dt/(eps**2+dt*r(x))#
     A = eps/(eps**2+dt*r(x))*v
     return x + A*dt + np.sqrt(2*dt*D)*z#v*dt + np.sqrt(2*dt*D)*z
 
-def psi_c(x,v,dt,eps,u,B,r,v_bar = None):
+def psi_c(x,v,dt,eps,u,B,r,v_next = None):
     '''
     u: vector of uniform numbers in [0,1] to sample from M with appropriate probability
     '''
     p = (u>=eps**2/(eps**2+dt*r(x))) #1 if collision occurs
-    if v_bar is None:
-        _,v_bar = B(x)
+    if v_next is None:
+        v_next,v_bar = B(x)
 
-    v = (1-p)*v + p*v_bar
+    v = (1-p)*v + p*v_next#v_bar
     return v,v_bar
 
-def phi_APS(x,v,dt,eps,z,u,B,r,v_next=None,boundary=None,diff=False):
-    x = psi_t(x,v,dt,eps,z,r,diff=diff)
+def phi_APS(x,v,dt,eps,z,u,B,r,v_next=None,boundary=None,diff=False,v_ms=1):
+    x = psi_t(x,v,dt,eps,z,r,diff=diff,v_ms=v_ms)
     if boundary is not None:
         x = boundary(x)
     v,v_bar = psi_c(x,v,dt,eps,u,B,r,v_next)
     return x,v,v_bar
 
-def phi_APS_new(x,v,dt,eps,z,u,B,r,v_next=None,boundary=None,diff=False):
+def phi_APS_new(x,v,dt,eps,z,u,B,r,v_next=None,boundary=None,diff=False,v_ms=1):
     v,v_bar = psi_c(x,v,dt,eps,u,B,r,v_next)
-    x = psi_t(x,v,dt,eps,z,r,diff=diff)
+    x = psi_t(x,v,dt,eps,z,r,diff=diff,v_ms=v_ms)
     if boundary is not None:
         x = boundary(x)
     return x,v,v_bar
@@ -43,8 +44,8 @@ def phi_standard(x,v,dt,eps,M,r,boundary):
     #collision step
     u = np.random.uniform(0,1,size=len(x))
     p = u>np.exp(-r(x)/eps**2*dt)
-    _,v_bar = M(x)
-    v = (1-p)*v + p*v_bar
+    v_next,v_bar = M(x)
+    v = (1-p)*v + p*v_next#v_bar
     return x,v
 
 

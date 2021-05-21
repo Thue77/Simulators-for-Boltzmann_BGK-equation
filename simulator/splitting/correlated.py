@@ -6,7 +6,7 @@ from numba import prange
 import sys
 
 @njit(nogil=True)
-def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False):
+def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False,v_ms=!):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -30,7 +30,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False):
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
         for m in range(M_t):
             C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
-            x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary,diff=diff)
+            x_f,v_f,v_bar_f = phi_APS(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary,diff=diff,v_ms=v_ms)
             v_bar_c[C[:,m]] = v_f[C[:,m]]
             if strategy == 3 and first_level:
                 v_bar_all[:,m] = v_f
@@ -39,7 +39,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False):
         else:
             z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
         u_c = max_np(U,axis=1)**M_t
-        x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary,diff=diff)
+        x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary,diff=diff,v_ms=v_ms)
         t += dt_c
     return x_f,x_c
 @njit(nogil=True)
