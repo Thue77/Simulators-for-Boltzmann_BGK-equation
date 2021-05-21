@@ -7,7 +7,7 @@ import sys
 def psi_t(x,v,dt,eps,z,r,diff=False,v_ms=1):
     '''v_ms: <nu^2>'''
     if diff:
-        D = v_ms**2*dt/(eps**2+dt*r(x))#
+        D = v_ms*dt/(eps**2+dt*r(x))#
     else:
         D = v**2*dt/(eps**2+dt*r(x))#
     A = eps/(eps**2+dt*r(x))*v
