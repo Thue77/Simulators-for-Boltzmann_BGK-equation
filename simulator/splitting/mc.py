@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 
 @njit(nogil=True)
-def mc(dt,t0,T,N,eps,Q,M,r,boundary = None,sigma=None,rev=False,diff=False,v_ms=!):
+def mc(dt,t0,T,N,eps,Q,M,r,boundary = None,sigma=None,rev=False,diff=False,v_ms=1):
     t = t0
     x,v,_ = Q(N)
     while t<T:

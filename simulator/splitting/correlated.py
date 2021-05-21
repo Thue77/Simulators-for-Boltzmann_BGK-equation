@@ -6,7 +6,7 @@ from numba import prange
 import sys
 
 @njit(nogil=True)
-def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False,v_ms=!):
+def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False,v_ms=1):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
