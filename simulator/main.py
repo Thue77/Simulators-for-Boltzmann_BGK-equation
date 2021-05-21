@@ -459,8 +459,13 @@ jit_module(nopython=True,nogil=True)
 if __name__ == '__main__':
     if args.folder:
         path = os.getcwd()
-        path = path+ '\\'+args.folder
-        os.chdir(path)
+        try:
+            sep = args.separator if args.separator else '\\'
+            path = path+ sep+args.folder
+            os.chdir(path)
+        except FileNotFoundError:
+            print('Give the separator that fits with your operating system. It is done by adding the argument -sep "your_separator"')
+            raise
     if ml_test_APS:
         E2=0.01/2**np.arange(0,13)
         if uf:
