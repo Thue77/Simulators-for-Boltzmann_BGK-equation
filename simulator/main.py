@@ -807,7 +807,7 @@ if __name__ == '__main__':
                 logfile=None
             KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)
     if diffusion_limit:
-        T = 1;t0=0;dt_list=T/2**np.arange(0,6)
+        T = 1;t0=0;dt_list=T/2**np.arange(0,6);M_t=2
         if N is None:
             N = 120_000
         x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon=0.001.txt')
@@ -816,5 +816,5 @@ if __name__ == '__main__':
         W[0,:],err[0,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
         W[1,:],err[1,:] = KDMC_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
         W[2,:],err[2,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True)
-        with open('density_resultfile_a_{}_b_{}_all_eps_and_dt.txt','w'):
+        with open('density_resultfile_a_{}_b_{}_all_eps_and_dt.txt','w') as f:
             np.savetxt(f,(W,err))
