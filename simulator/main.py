@@ -476,20 +476,25 @@ if __name__ == '__main__':
                 (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
             else:
                 (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
-            plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
-            plt.plot(dt_list[1:],np.abs(bias[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
-            plt.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
+            plt.plot(range(1,dt_list.size),var2[1:],':',label='var(F(X^f)-F(X^c))')
+            plt.plot(range(dt_list.size),var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
+            plt.plot(range(1,dt_list.size),np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
+            plt.plot(range(dt_list.size),v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
             plt.title(f'Plot of variance and bias')
-            plt.xscale('log')
+            # plt.xscale('log')
             plt.yscale('log')
+            plt.xlabel('Levels')
             plt.legend()
             plt.figure()
             plt.plot(range(1,dt_list.size),kur1[1:],':')
+            plt.xlabel('Levels')
+            plt.ylabel(r'$\frac{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^4]}{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^2]^2}$')
             plt.title(f'Plot of kurtosis')
             plt.figure()
             plt.plot(range(1,dt_list.size),cons[1:],':')
             plt.title(f'Plot check of consistency')
+            plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
+            plt.xlabel('Levels')
 
             # dfs = {}
             # for e2 in E2:
@@ -522,19 +527,24 @@ if __name__ == '__main__':
         E2=0.01/2**np.arange(0,13)
         if uf:
             (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
-            plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
-            plt.plot(dt_list[1:],np.abs(bias[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
-            plt.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
+            plt.plot(range(1,dt_list.size),var2[1:],':',label='var(F(X^f)-F(X^c))')
+            plt.plot(range(dt_list.size),var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
+            plt.plot(range(1,dt_list.size),np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
+            plt.plot(range(dt_list.size),v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
             plt.title(f'Plot of variance and bias')
-            plt.xscale('log')
+            plt.xlabel('Levels')
+            # plt.xscale('log')
             plt.yscale('log')
             plt.legend()
             plt.figure()
             plt.plot(range(1,dt_list.size),kur1[1:],':')
+            plt.xlabel('Levels')
+            plt.ylabel(r'$\frac{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^4]}{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^2]^2}$')
             plt.title(f'Plot of kurtosis')
             plt.figure()
             plt.plot(range(1,dt_list.size),cons[1:],':')
+            plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
+            plt.xlabel('Levels')
             plt.title(f'Plot check of consistency')
             # dfs = {}
             # for e2 in E2:
@@ -797,9 +807,13 @@ if __name__ == '__main__':
                 logfile=None
             KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)
     if diffusion_limit:
-        T = 1;t0=0;dt=T/4
+        T = 1;t0=0;dt_list=T/2**np.arange(0,6)
         if N is None:
             N = 120_000
-        x_std = KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
-        if args.save_file:
-            np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt',x_std)
+        x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon=0.001.txt')
+        W = np.zeros((3,dt_list.size))
+        W[0,:],err = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
+        W[1,:],err = KDMC_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
+        W[2,:],err = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True)
+        with open('density_resultfile_a_{}_b_{}_all_eps_and_dt.txt','w'):
+            np.savetxt(f,(W,err))
