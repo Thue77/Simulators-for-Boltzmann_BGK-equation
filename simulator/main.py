@@ -803,6 +803,3 @@ if __name__ == '__main__':
         x_std = KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
         if args.save_file:
             np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt',x_std)
-
-
-        for e in
