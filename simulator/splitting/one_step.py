@@ -11,7 +11,7 @@ def psi_t(x,v,dt,eps,z,r,diff=False,v_ms=1):
     else:
         D = v**2*dt/(eps**2+dt*r(x))#
     A = eps/(eps**2+dt*r(x))*v
-    return x + A*dt + np.sqrt(2*dt*D)*z#v*dt + np.sqrt(2*dt*D)*z
+    return x + A*dt + np.sqrt(2*dt*D)*z
 
 def psi_c(x,v,dt,eps,u,B,r,v_next = None):
     '''

@@ -47,6 +47,7 @@ parser.add_argument('-rev','--reverse_splitting',action='store_true',help='Varia
 parser.add_argument('-diff','--altered_diff_coef',action='store_true',help='Variable for ML-testing with splitting approach. Indicates if altered diffusive coefficient should be used.')
 parser.add_argument('-pc','--post_collisional',action='store_true',help='If given, the initial velocity distribution corresponds to the post-collisional distribution')
 parser.add_argument('-sep','--separator',type=str,help='File path separator used in paths on your system. Default is for Windows 10')
+parser.add_argument('-dl','--diffusion_limit',action='store_true',help='Test diffusion limit of the models')
 
 
 args = parser.parse_args()
@@ -63,9 +64,10 @@ level_selection = args.level_selection; correlation_test = args.correlation_test
 uf = args.use_file
 rev = args.reverse_splitting; diff = args.altered_diff_coef
 post_collisional = args.post_collisional
+diffusion_limit = args.diffusion_limit
 
 
-if not args.correlated_time_test and not args.correlation_test and not args.density_est and not args.ml_test_KD and not args.ml_test_APS and not args.goldstein_taylor and not args.radiative_transport and not args.level_selection:
+if not args.diffusion_limit and not args.correlated_time_test and not args.correlation_test and not args.density_est and not args.ml_test_KD and not args.ml_test_APS and not args.goldstein_taylor and not args.radiative_transport and not args.level_selection:
     sys.exit('ERROR: no valid example given. Run "main.py -h" for more info')
 
 if uf and args.save_file:
@@ -99,9 +101,9 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # print('Her')
         v_norm = np.random.normal(0,1,size=N)
         v = v_norm.copy()#/epsilon
-    elif ml_test_KD or ml_test_APS or density_est:
+    elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         x,v,v_norm = test2(N)
-        v = v#/epsilon
+        v = v/epsilon
     return x,v,v_norm
 
 def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
@@ -118,9 +120,9 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # x,v,v_norm = test3(N)
         x = np.ones(N); v_norm = np.random.normal(0,1,size=N)
         v = v_norm*epsilon
-    elif ml_test_KD or ml_test_APS or density_est:
+    elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         x,v,v_norm = test2(N)
-        v=v_norm*epsilon
+        v=v_norm.copy()
     elif correlation_test or correlated_time_test:
         x = np.ones(N); v = np.random.normal(0,1,size=N)
         v_norm = v.copy()
@@ -132,11 +134,11 @@ def R(x):
         return 1/(epsilon**2)
     elif level_selection:
         return -b*(a*(x-1)-1)*(x<=1) + b*(a*(x-1)+1)*np.logical_not(x<=1)
-    elif ml_test_KD or ml_test_APS or density_est:
+    elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         return 1/epsilon**2*((-a*(x-0.5)+b)*(x<=0.5) + (a*(x-0.5)+b)*(x>0.5))
 
 def r(x):
-    if ml_test_KD or ml_test_APS or density_est:
+    if ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         return (-a*(x-0.5)+b)*(x<=0.5) + (a*(x-0.5)+b)*(x>0.5)
         #return a*x+b
     else:
@@ -147,7 +149,7 @@ def dR(x):
         return 0
     elif level_selection:
         return (x<=1)*(-b*a) + (x>1)*(b*a)
-    elif ml_test_KD or ml_test_APS or density_est:
+    elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         if a==0:
             return 0
         else:
@@ -159,7 +161,7 @@ def R_anti(x):
         return x/(epsilon**2)
     elif level_selection:
         return (-b*a/2*x**2+b*(a+1)*x)*(x<=1) + (-b*a/2+b*(a+1) -b*a/2-b*(1-a)+b*a/2*x**2+b*(1-a)*x)*(x>1)#(-b*a/2*x**2 + (a+1)*b*x)*(x<=1) + (b*a/2*x**2+(1-a)*b*x)*(x>1)
-    elif ml_test_KD or ml_test_APS or density_est:
+    elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         return 1/epsilon**2*((-a*(x**2/2-0.5*x)+b*x)*(x<=0.5) + ((-a*(0.5**2/2-0.5*0.5)+b*0.5) + (a*(x**2/2-0.5*x)+b*x) - (a*(0.5**2/2-0.5*0.5)+b*0.5))*(x>0.5))
 
 #Sample Collision
@@ -224,7 +226,7 @@ def SC(x,v,e):
             e_local[index_new] = e_local[index_new]-I[index_new_domain]/np.abs(v[index_new])
             '''Update x to equal the value of the boundary that it is crossing'''
             x_new[index_new] = boundaries[bins[index_new] + (direction[index_new]<0)]
-    elif ml_test_KD or ml_test_APS or density_est or level_selection:
+    elif ml_test_KD or ml_test_APS or density_est or level_selection or diffusion_limit:
         if a==0:
             dtau = 1/R(x)*e
         else:
@@ -347,7 +349,7 @@ def SC(x,v,e):
 
 @njit(nogil=True,parallel=True)
 def roots(x,v,e):
-    if density_est or ml_test_APS or ml_test_KD or level_selection:
+    if density_est or ml_test_APS or ml_test_KD or level_selection or diffusion_limit:
         alpha = -a/epsilon**2*(x<=0.5) + a/epsilon**2*(x>0.5)
         beta = (b+a/2)/epsilon**2*(x<=0.5) + (b-a/2)/epsilon**2*(x>0.5)
         pc = -e*v; pb = alpha*v*x+beta*v; pa = alpha/2*v**2
@@ -391,8 +393,8 @@ def mu(x):
 
 
 def sigma(x):
-    if ml_test_KD or ml_test_APS or density_est or correlated_time_test:
-        return 1#/epsilon
+    if ml_test_KD or ml_test_APS or density_est or correlated_time_test or diffusion_limit:
+        return 1/epsilon
     elif level_selection:
         return 1
     elif radiative_transport:
@@ -405,9 +407,9 @@ def M(x):
         # v_next = (1-v_norm*2)/epsilon
         v_next = np.random.uniform(-1,1,size=len(x))/epsilon
         v_norm = v_next/sigma(x)
-    elif ml_test_KD or ml_test_APS or density_est:
+    elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         v_norm = np.random.normal(0,1,size=x.size)
-        v_next = v_norm.copy()#/epsilon
+        v_next = v_norm/epsilon
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = mu(x) + sigma(x)*v_norm
@@ -424,9 +426,9 @@ def M_nu(x):
         U = np.random.uniform(0,1,size=len(x))
         v_next =  (U <= 0.5).astype(np.float64) - (U > 0.5).astype(np.float64)
         v_norm = v_next.copy()
-    elif ml_test_KD or ml_test_APS or density_est:
+    elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         v_norm = np.random.normal(0,1,size=x.size)
-        v_next = v_norm*epsilon
+        v_next = v_norm.copy()
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = v_norm.copy()
@@ -444,7 +446,7 @@ def boundary_periodic(x):
 def boundary(x):
     return x
 
-v_ms = epsilon**2 if density_est or ml_test_APS else 1
+v_ms = 1#epsilon**2 if density_est or ml_test_APS else 1
 
 '''Function related to the quantity of interest, E(F(X,V))'''
 def F(x,v=0):
@@ -558,16 +560,16 @@ if __name__ == '__main__':
             logfile = open(f'logfile_APS_Goldstein_Taylor_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
         else:
             logfile=None
-        # APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False)
-        x_std = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
-        W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std)
-        plt.errorbar(dt_list,W,err,label='Error APS GT dist')
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel(r'$\Delta t$')
-        plt.ylabel('Wasserstein distance')
-        plt.legend()
-        plt.show()
+        APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False)
+        # x_std = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
+        # W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std)
+        # plt.errorbar(dt_list,W,err,label='Error APS GT dist')
+        # plt.xscale('log')
+        # plt.yscale('log')
+        # plt.xlabel(r'$\Delta t$')
+        # plt.ylabel('Wasserstein distance')
+        # plt.legend()
+        # plt.show()
     if density_est:
         if N is None:
             N = 120_000
@@ -794,3 +796,13 @@ if __name__ == '__main__':
             else:
                 logfile=None
             KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)
+    if diffusion_limit:
+        T = 1;t0=0;dt=T/4
+        if N is None:
+            N = 120_000
+        x_std = KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+        if args.save_file:
+            np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}_dt_{dt}.txt',x_std)
+
+
+        for e in
