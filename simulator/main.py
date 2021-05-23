@@ -804,6 +804,9 @@ if __name__ == '__main__':
                 logfile=None
             KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)
     if diffusion_limit:
+        '''
+        epsilon= [1,0.32,0.1,0.032,0.01,0.005,0.001,0.0005]
+        '''
         T = 1;t0=0;dt_list=T/2**np.arange(0,8);M_t=2
         if N is None:
             N = 120_000
@@ -826,11 +829,11 @@ if __name__ == '__main__':
         # W4 = np.zeros(8); err4 = np.zeros(8)
         # W5 = np.zeros(8); err4 = np.zeros(8)
         # for i in range(8):
-        #     W1[i] = data[i*6,4]; err1[i] = data[3+i*6,4]
-        #     W2[i] = data[1+i*6,4]; err2[i] = data[4+i*6,4]
-        #     W3[i] = data[2+i*6,4]; err3[i] = data[5+i*6,4]
-        #     W4[i] = data[3+i*6,4]; err3[i] = data[6+i*6,4]
-        #     W5[i] = data[4+i*6,4]; err5[i] = data[7+i*6,4]
+        #     W1[i] = data[i*10,4]; err1[i] = data[3+i*10,4]
+        #     W2[i] = data[1+i*10,4]; err2[i] = data[4+i*10,4]
+        #     W3[i] = data[2+i*10,4]; err3[i] = data[5+i*10,4]
+        #     W4[i] = data[3+i*10,4]; err3[i] = data[6+i*10,4]
+        #     W5[i] = data[4+i*10,4]; err5[i] = data[7+i*10,4]
         # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W1,err1,label='Error for APS')
         # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W2,err2,label='Error for KD')
         # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W3,err3,label='Error for APS with altered diffusion coefficient')
