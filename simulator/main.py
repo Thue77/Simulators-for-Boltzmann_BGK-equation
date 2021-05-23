@@ -810,16 +810,17 @@ if __name__ == '__main__':
         '''
         T = 1;t0=0;dt_list=T/2**np.arange(0,8);M_t=2
         if N is None:
-            N = 120_000
+            N = 1_200_000
         x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+        np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
         # x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
         W = np.zeros((5,dt_list.size))
         err = np.zeros((5,dt_list.size))
-        W[0,:],err[0,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
-        W[1,:],err[1,:] = KDMC_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
-        W[2,:],err[2,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True)
-        W[3,:],err[3,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True,rev=True)
-        W[4,:],err[4,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=False,rev=True)
+        W[0,:],err[0,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
+        W[1,:],err[1,:] = KDMC_density_test(dt_list,Q,t0,T,int(N/10),mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
+        W[2,:],err[2,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True)
+        W[3,:],err[3,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True,rev=True)
+        W[4,:],err[4,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=False,rev=True)
         with open(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt','w') as f:
             np.savetxt(f,np.vstack((W,err)))
         # data = np.loadtxt(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt')
