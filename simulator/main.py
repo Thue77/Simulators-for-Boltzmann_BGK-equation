@@ -613,9 +613,9 @@ if __name__ == '__main__':
                     data = np.loadtxt(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
             else:
                 print(f'{N} paths used to simulate exact density')
-                x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
-                # x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
-                if args.save_file:
+                # x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+                x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
+                if args.save_file and False:
                     if post_collisional:
                         np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt',x_std)
                     else:
@@ -812,15 +812,21 @@ if __name__ == '__main__':
         if N is None:
             N = 1_200_000
         x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+        print('Exact is done')
         np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
         # x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
         W = np.zeros((5,dt_list.size))
         err = np.zeros((5,dt_list.size))
         W[0,:],err[0,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
+        print('APSMC is done')
         W[1,:],err[1,:] = KDMC_density_test(dt_list,Q,t0,T,int(N/10),mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
+        print('KDMC is done')
         W[2,:],err[2,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True)
+        print('APSMC is done, diff=True')
         W[3,:],err[3,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True,rev=True)
+        print('APSMC is done, diff=True, rev=True')
         W[4,:],err[4,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=False,rev=True)
+        print('APSMC is done, diff=False,rev=true')
         with open(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt','w') as f:
             np.savetxt(f,np.vstack((W,err)))
         # data = np.loadtxt(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt')
