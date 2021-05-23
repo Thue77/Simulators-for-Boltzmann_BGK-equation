@@ -1,0 +1,9 @@
+@inproceedings{MC_for_Boltzmann_introduction,
+  title={An introduction to Monte Carlo method for the Boltzmann equation},
+  author={Pareschi, Lorenzo and Russo, Giovanni},
+  booktitle={ESAIM: Proceedings},
+  volume={10},
+  pages={35--75},
+  year={2001},
+  organization={EDP Sciences}
+}
