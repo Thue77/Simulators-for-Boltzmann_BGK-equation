@@ -582,7 +582,7 @@ if __name__ == '__main__':
         # plt.show()
     if density_est:
         if N is None:
-            N = 120_000
+            N = 1_200_000
         if N%8!=0 or N%80!=0:
             sys.exit('Please provide a number of paths divisible by 8 and 80')
         N0=40; T=1; dt_list = T/2**np.arange(0,17,1); t0=0; M_t=2
@@ -813,7 +813,7 @@ if __name__ == '__main__':
             N = 1_200_000
         x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
         print('Exact is done')
-        np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
+        np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt',x_std)
         # x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
         W = np.zeros((5,dt_list.size))
         err = np.zeros((5,dt_list.size))
@@ -827,7 +827,7 @@ if __name__ == '__main__':
         print('APSMC is done, diff=True, rev=True')
         W[4,:],err[4,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=False,rev=True)
         print('APSMC is done, diff=False,rev=true')
-        with open(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt','w') as f:
+        with open(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt','a') as f:
             np.savetxt(f,np.vstack((W,err)))
         # data = np.loadtxt(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt')
         # print(data.shape)
