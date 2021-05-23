@@ -806,6 +806,7 @@ if __name__ == '__main__':
     if diffusion_limit:
         '''
         epsilon= [1,0.32,0.1,0.032,0.01,0.005,0.001,0.0005]
+        a = 0, b = 1
         '''
         T = 1;t0=0;dt_list=T/2**np.arange(0,8);M_t=2
         if N is None:
@@ -823,6 +824,7 @@ if __name__ == '__main__':
             np.savetxt(f,np.vstack((W,err)))
         # data = np.loadtxt(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt')
         # print(data.shape)
+        # length is number of epsilons
         # W1 = np.zeros(8); err1 = np.zeros(8)
         # W2 = np.zeros(8); err2 = np.zeros(8)
         # W3 = np.zeros(8); err3 = np.zeros(8)
