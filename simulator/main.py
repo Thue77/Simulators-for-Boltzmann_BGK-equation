@@ -115,7 +115,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         x = np.ones(N)
         # print('Her')
         v_norm = np.random.normal(0,1,size=N)
-        v = v_norm.copy()#/epsilon
+        v = v_norm/epsilon
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         x,v,v_norm = test2(N)
         v = v/epsilon
@@ -134,7 +134,7 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional) or (diffusion_limit and post_collisional):
         # x,v,v_norm = test3(N)
         x = np.ones(N); v_norm = np.random.normal(0,1,size=N)
-        v = v_norm*epsilon
+        v = v_norm#*epsilon
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         x,v,v_norm = test2(N)
         v=v_norm.copy()
@@ -837,6 +837,7 @@ if __name__ == '__main__':
         T = 1;t0=0;dt_list=T/2**np.arange(0,7);M_t=2
         if N is None:
             N = 1_200_000
+        print(f'{N} paths used')
         x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
         print('Exact is done')
         np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt',x_std)
