@@ -834,7 +834,7 @@ if __name__ == '__main__':
         # sns.kdeplot(data=dist, x="x")
         # plt.show()
 
-        T = 1;t0=0;dt_list=T/2**np.arange(0,8);M_t=2
+        T = 1;t0=0;dt_list=T/2**np.arange(0,7);M_t=2
         if N is None:
             N = 1_200_000
         x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
