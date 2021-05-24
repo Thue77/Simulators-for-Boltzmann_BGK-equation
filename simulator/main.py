@@ -38,6 +38,7 @@ parser.add_argument('-rt','--radiative_transport',action='store_true',help='Radi
 parser.add_argument('-ct','--correlation_test',action='store_true',help='Plot to compare fine and coarse path for new correlation. Homogenous background is used.')
 parser.add_argument('-gt','--goldstein_taylor',action='store_true',help='Runs ml_test for APS with Goldstein-Taylor distribution as post-collisional distribution and r(x)=1')
 parser.add_argument('-ls','--level_selection',action='store_true',help='Runs level-selction example in KDML')
+parser.add_argument('-os','--one_step_dist',action='store_true',help='plots distribution after one step of KDMC method to compare with Figure 4 in KDMC article by Bert Mortier')
 parser.add_argument('-ctt','--correlated_time_test',action='store_true',help='Test the time is takes to correlate paths as a function of the step size. Test is done for all three kinds of correlation. For a comparison with non-numba runs, numba must be deactivated manually in the code. Homogenous background is used')
 parser.add_argument('-sf','--save_file',action='store_true',help='indicates that files should be saved when running examples')
 parser.add_argument('-uf','--use_file',default=False,action='store_true',help='indidcates if existing files should be used. In case it should be, remember to give the appropriate folder!')
@@ -65,20 +66,34 @@ uf = args.use_file
 rev = args.reverse_splitting; diff = args.altered_diff_coef
 post_collisional = args.post_collisional
 diffusion_limit = args.diffusion_limit
+one_step_dist = args.one_step_dist
 
 
-if not args.diffusion_limit and not args.correlated_time_test and not args.correlation_test and not args.density_est and not args.ml_test_KD and not args.ml_test_APS and not args.goldstein_taylor and not args.radiative_transport and not args.level_selection:
+if not args.one_step_dist and not args.diffusion_limit and not args.correlated_time_test and not args.correlation_test and not args.density_est and not args.ml_test_KD and not args.ml_test_APS and not args.goldstein_taylor and not args.radiative_transport and not args.level_selection:
     sys.exit('ERROR: no valid example given. Run "main.py -h" for more info')
 
 if uf and args.save_file:
     sys.exit('ERROR: Cannot both use existing file and save result')
 
 if args.save_file:
-    print(f'files are saved in {args.folder}')
+    if args.folder:
+        print(f'files are saved in {args.folder}')
+    else:
+        print('files are saved in the working directory')
 
 #Inintial distribution of position and velocity
 def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     '''Initial distribution for (x,v)'''
+    if one_step_dist:
+        U = np.random.uniform(0,1,size=N)
+        I = np.random.uniform(0,1,size=N)>0.5
+        index = np.argwhere(I).flatten()
+        index_not = np.argwhere(np.logical_not(I)).flatten()
+        x = np.zeros(N)
+        v = np.zeros(N)
+        v_norm = np.append(np.random.normal(0,1,size = len(index)),np.random.normal(0,1,size = N-len(index)))
+        v[index] = (v_norm[0:len(index)] + 10)
+        v[index_not] = (v_norm[len(index):]-10)
     if level_selection or correlated_time_test:
         x = np.ones(N)
         # print('Her')
@@ -95,7 +110,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         # # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
         # v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
         v_norm = v/sigma(x)
-    elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional):
+    elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional) or (diffusion_limit and post_collisional):
         # x,v,v_norm = test3(N)
         x = np.ones(N)
         # print('Her')
@@ -116,7 +131,7 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v =  (U <= 0.5).astype(np.float64) - (U > 0.5).astype(np.float64)
         x = np.zeros(N)
         v_norm = v.copy()
-    elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional):
+    elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional) or (diffusion_limit and post_collisional):
         # x,v,v_norm = test3(N)
         x = np.ones(N); v_norm = np.random.normal(0,1,size=N)
         v = v_norm*epsilon
@@ -130,7 +145,7 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
 
 #sets the collision rate
 def R(x):
-    if radiative_transport or correlated_time_test:
+    if radiative_transport or correlated_time_test or one_step_dist:
         return 1/(epsilon**2)
     elif level_selection:
         return -b*(a*(x-1)-1)*(x<=1) + b*(a*(x-1)+1)*np.logical_not(x<=1)
@@ -145,7 +160,7 @@ def r(x):
         return np.ones(len(x))
 
 def dR(x):
-    if radiative_transport or correlated_time_test:
+    if radiative_transport or correlated_time_test or one_step_dist:
         return 0
     elif level_selection:
         return (x<=1)*(-b*a) + (x>1)*(b*a)
@@ -157,7 +172,7 @@ def dR(x):
 
 #Anti derivative of R
 def R_anti(x):
-    if radiative_transport or correlated_time_test:
+    if radiative_transport or correlated_time_test or one_step_dist:
         return x/(epsilon**2)
     elif level_selection:
         return (-b*a/2*x**2+b*(a+1)*x)*(x<=1) + (-b*a/2+b*(a+1) -b*a/2-b*(1-a)+b*a/2*x**2+b*(1-a)*x)*(x>1)#(-b*a/2*x**2 + (a+1)*b*x)*(x<=1) + (b*a/2*x**2+(1-a)*b*x)*(x>1)
@@ -167,7 +182,7 @@ def R_anti(x):
 #Sample Collision
 # @njit(nogil=True,parallel = True)
 def SC(x,v,e):
-    if radiative_transport or a==0 or correlated_time_test:
+    if radiative_transport or a==0 or correlated_time_test or one_step_dist:
         dtau = 1/R(x)*e
     elif level_selection and False:# or density_est or ml_test_APS or ml_test_KD:
         '''The background is piece wise linear and it is necessary to identify
@@ -393,7 +408,7 @@ def mu(x):
 
 
 def sigma(x):
-    if ml_test_KD or ml_test_APS or density_est or correlated_time_test or diffusion_limit:
+    if ml_test_KD or ml_test_APS or density_est or correlated_time_test or diffusion_limit or one_step_dist:
         return 1/epsilon
     elif level_selection:
         return 1
@@ -651,8 +666,8 @@ if __name__ == '__main__':
                         np.savetxt(file,(W,err))
             plt.errorbar(dt_list,W,err,label='Error for reverse APS')
             if uf:
-                W = data[2]
-                err = data[3]
+                W = data[4]
+                err = data[5]
             else:
                 W,err = KDMC_density_test(dt_list,Q,t0,T,N/10,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
             if args.save_file:
@@ -664,8 +679,8 @@ if __name__ == '__main__':
                         np.savetxt(file,(W,err))
             plt.errorbar(dt_list,W,err,label='Error for KD')
             if uf:
-                W = data[4]
-                err = data[5]
+                W = data[6]
+                err = data[7]
             else:
                 start = time.time()
                 W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=False,diff=True,v_ms=v_ms)
@@ -805,50 +820,80 @@ if __name__ == '__main__':
             KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)
     if diffusion_limit:
         '''
-        epsilon= [1,0.32,0.1,0.032,0.01,0.005,0.001,0.0005]
+        epsilon= [1,0.32,0.1,0.032,0.01,0.005,0.001]
         a = 0, b = 1
         '''
+        # if N is None:
+        #     N = 100_000
+        # dt = 1
+        # t = 0
+        # T = 1
+        # # print(f'tau > T: {np.where(tau>T)}')
+        # x = KMC_par(dt,N,Q,t,T,mu,sigma,M,R,SC,dR,boundary)
+        # dist = pd.DataFrame(data={'x':x})
+        # sns.kdeplot(data=dist, x="x")
+        # plt.show()
+
         T = 1;t0=0;dt_list=T/2**np.arange(0,8);M_t=2
         if N is None:
             N = 1_200_000
         x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
         print('Exact is done')
-        np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt',x_std)
+        np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt',x_std)
         # x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
         W = np.zeros((5,dt_list.size))
         err = np.zeros((5,dt_list.size))
-        W[0,:],err[0,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
-        print('APSMC is done')
-        W[1,:],err[1,:] = KDMC_density_test(dt_list,Q,t0,T,int(N/10),mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
+        test = x_std.copy()
+        W[0,:],err[0,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
+        print(np.max(test-x_std))
+        # print('APSMC is done')
+        W[1,:],err[1,:] = KDMC_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
+        print(W)
+        print(err)
         print('KDMC is done')
-        W[2,:],err[2,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True)
+        W[2,:],err[2,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True)
         print('APSMC is done, diff=True')
-        W[3,:],err[3,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True,rev=True)
+        W[3,:],err[3,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True,rev=True)
         print('APSMC is done, diff=True, rev=True')
-        W[4,:],err[4,:] = APSMC_density_test(dt_list,M_t,t0,T,int(N/10),epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=False,rev=True)
+        W[4,:],err[4,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=False,rev=True)
         print('APSMC is done, diff=False,rev=true')
-        with open(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt','a') as f:
+        with open(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt_post.txt','w') as f:
             np.savetxt(f,np.vstack((W,err)))
         # data = np.loadtxt(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt')
         # print(data.shape)
-        # length is number of epsilons
-        # W1 = np.zeros(8); err1 = np.zeros(8)
-        # W2 = np.zeros(8); err2 = np.zeros(8)
-        # W3 = np.zeros(8); err3 = np.zeros(8)
-        # W4 = np.zeros(8); err4 = np.zeros(8)
-        # W5 = np.zeros(8); err4 = np.zeros(8)
-        # for i in range(8):
-        #     W1[i] = data[i*10,4]; err1[i] = data[3+i*10,4]
-        #     W2[i] = data[1+i*10,4]; err2[i] = data[4+i*10,4]
-        #     W3[i] = data[2+i*10,4]; err3[i] = data[5+i*10,4]
-        #     W4[i] = data[3+i*10,4]; err3[i] = data[6+i*10,4]
-        #     W5[i] = data[4+i*10,4]; err5[i] = data[7+i*10,4]
+        # # length is number of epsilons
+        # W1 = np.zeros(6); err1 = np.zeros(6)
+        # W2 = np.zeros(6); err2 = np.zeros(6)
+        # W3 = np.zeros(6); err3 = np.zeros(6)
+        # W4 = np.zeros(6); err4 = np.zeros(6)
+        # W5 = np.zeros(6); err5 = np.zeros(6)
+        # step=7
+        # for i in range(6):
+        #     W1[i] = data[i*10,step]; err1[i] = data[5+i*10,step]
+        #     W2[i] = data[1+i*10,step]; err2[i] = data[6+i*10,step]
+        #     W3[i] = data[2+i*10,step]; err3[i] = data[7+i*10,step]
+        #     W4[i] = data[3+i*10,step]; err4[i] = data[8+i*10,step]
+        #     W5[i] = data[4+i*10,step]; err5[i] = data[9+i*10,step]
+        # # print(err2)
         # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W1,err1,label='Error for APS')
         # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W2,err2,label='Error for KD')
         # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W3,err3,label='Error for APS with altered diffusion coefficient')
+        # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W4,err4,label='Error for reverse APS with altered diffusion coefficient')
+        # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W5,err5,label='Error for reverse APS')
         # plt.xscale('log')
         # plt.yscale('log')
         # plt.xlabel(r'$\epsilon$')
         # plt.ylabel('Wasserstein distance')
         # plt.legend()
         # plt.show()
+    if one_step_dist:
+        if N is None:
+            N = 100_000
+        dt = 1
+        t = 0
+        T = 1
+        # print(f'tau > T: {np.where(tau>T)}')
+        x = KMC_par(N,Q,t,T,mu,sigma,M,R,SC,dR,boundary)
+        dist = pd.DataFrame(data={'x':x})
+        sns.kdeplot(data=dist, x="x")
+        plt.show()
