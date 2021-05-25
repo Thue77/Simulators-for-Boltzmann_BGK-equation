@@ -105,7 +105,7 @@ def mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
         if x0 is None and v0 is None:
             x_KD[i,:] = KDMC(dt,n,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
         else:
-            x_KD[i,:] = KDMC(dt,n,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x0[i*n:(i+1)*n],v0[i*n:(i+1)*n])
+            x_KD[i,:] = KDMC(dt,n,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x0=x0[i*n:(i+1)*n],v0=v0[i*n:(i+1)*n])
     return x_KD.flatten()
 
 @njit(nogil=True,parallel=True)
@@ -117,7 +117,7 @@ def mc2_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
         if x0 is None and v0 is None:
             x_std[i,:] = Kinetic(n,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary)
         else:
-            x_std[i,:] = Kinetic(n,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary,x0[i*n:(i+1)*n],v0[i*n:(i+1)*n])
+            x_std[i,:] = Kinetic(n,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary,x0=x0[i*n:(i+1)*n],v0=v0[i*n:(i+1)*n])
     return x_std.flatten()
 
 def mc_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=None,boundary=None,x_std=None,x0=None,v0=None):
