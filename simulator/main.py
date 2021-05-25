@@ -892,8 +892,13 @@ if __name__ == '__main__':
             print('APSMC is done, diff=True, rev=True')
             W[4,:],err[4,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=False,rev=True,x0=x0,v0,v0)
             print('APSMC is done, diff=False,rev=true')
-            with open(f'density_resultfile_diffusion_limit_a_{a}_b_{b}_eps_{epsilon}_post.txt','w') as f:
-                np.savetxt(f,np.vstack((W,err)))
+            if args.save_file:
+                if post_collisional:
+                    with open(f'density_resultfile_diffusion_limit_a_{a}_b_{b}_eps_{epsilon}_post.txt','w') as f:
+                        np.savetxt(f,np.vstack((W,err)))
+                else:
+                    with open(f'density_resultfile_diffusion_limit_a_{a}_b_{b}_eps_{epsilon}.txt','w') as f:
+                        np.savetxt(f,np.vstack((W,err)))
 
 
     if one_step_dist:
