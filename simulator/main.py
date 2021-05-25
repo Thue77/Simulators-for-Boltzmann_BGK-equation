@@ -823,70 +823,79 @@ if __name__ == '__main__':
         epsilon= [1,0.32,0.1,0.032,0.01,0.005,0.001]
         a = 0, b = 1
         '''
-        # if N is None:
-        #     N = 100_000
-        # dt = 1
-        # t = 0
-        # T = 1
-        # # print(f'tau > T: {np.where(tau>T)}')
-        # x = KMC_par(dt,N,Q,t,T,mu,sigma,M,R,SC,dR,boundary)
-        # dist = pd.DataFrame(data={'x':x})
-        # sns.kdeplot(data=dist, x="x")
-        # plt.show()
-
         T = 1;t0=0;dt_list=T/2**np.arange(0,7);M_t=2
-        if N is None:
-            N = 1_200_000
-        print(f'{N} paths used')
-        x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
-        print('Exact is done')
-        np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt',x_std)
-        # x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
-        W = np.zeros((5,dt_list.size))
-        err = np.zeros((5,dt_list.size))
-        test = x_std.copy()
-        W[0,:],err[0,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
-        print(np.max(test-x_std))
-        # print('APSMC is done')
-        W[1,:],err[1,:] = KDMC_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
-        print(W)
-        print(err)
-        print('KDMC is done')
-        W[2,:],err[2,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True)
-        print('APSMC is done, diff=True')
-        W[3,:],err[3,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True,rev=True)
-        print('APSMC is done, diff=True, rev=True')
-        W[4,:],err[4,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=False,rev=True)
-        print('APSMC is done, diff=False,rev=true')
-        with open(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt_post.txt','w') as f:
-            np.savetxt(f,np.vstack((W,err)))
-        # data = np.loadtxt(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt')
-        # print(data.shape)
-        # # length is number of epsilons
-        # W1 = np.zeros(6); err1 = np.zeros(6)
-        # W2 = np.zeros(6); err2 = np.zeros(6)
-        # W3 = np.zeros(6); err3 = np.zeros(6)
-        # W4 = np.zeros(6); err4 = np.zeros(6)
-        # W5 = np.zeros(6); err5 = np.zeros(6)
-        # step=7
-        # for i in range(6):
-        #     W1[i] = data[i*10,step]; err1[i] = data[5+i*10,step]
-        #     W2[i] = data[1+i*10,step]; err2[i] = data[6+i*10,step]
-        #     W3[i] = data[2+i*10,step]; err3[i] = data[7+i*10,step]
-        #     W4[i] = data[3+i*10,step]; err4[i] = data[8+i*10,step]
-        #     W5[i] = data[4+i*10,step]; err5[i] = data[9+i*10,step]
-        # # print(err2)
-        # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W1,err1,label='Error for APS')
-        # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W2,err2,label='Error for KD')
-        # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W3,err3,label='Error for APS with altered diffusion coefficient')
-        # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W4,err4,label='Error for reverse APS with altered diffusion coefficient')
-        # plt.errorbar(np.array([1,0.32,0.1,0.032,0.01,0.005]),W5,err5,label='Error for reverse APS')
-        # plt.xscale('log')
-        # plt.yscale('log')
-        # plt.xlabel(r'$\epsilon$')
-        # plt.ylabel('Wasserstein distance')
-        # plt.legend()
-        # plt.show()
+        if uf:
+            eps = np.array([1,0.32,0.1,0.032,0.01,0.005])
+            step=int(input(f'Give index of step size to plot for: {dt_list}\n')) #between 0 and 6
+            if args.folder == 'nu_standard_extra_paths' or post_collisional:
+                W1 = np.zeros(eps.size); err1 = np.zeros(eps.size)
+                W2 = np.zeros(eps.size); err2 = np.zeros(eps.size)
+                W3 = np.zeros(eps.size); err3 = np.zeros(eps.size)
+                W4 = np.zeros(eps.size); err4 = np.zeros(eps.size)
+                W5 = np.zeros(eps.size); err5 = np.zeros(eps.size)
+                for i,e in enumerate(eps):
+                    if post_collisional:
+                        data =  np.loadtxt(f'density_resultfile_diffusion_limit_a_{a}_b_{b}_eps_{e}_post.txt')
+                    else:
+                        data =  np.loadtxt(f'density_resultfile_diffusion_limit_a_{a}_b_{b}_eps_{e}.txt')
+                    W1[i] = data[0,step]; err1[i] = data[5,step]
+                    W2[i] = data[1,step]; err2[i] = data[6,step]
+                    W3[i] = data[2,step]; err3[i] = data[7,step]
+                    W4[i] = data[3,step]; err4[i] = data[8,step]
+                    W5[i] = data[4,step]; err5[i] = data[9,step]
+            else:
+                data = np.loadtxt(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt')
+                # length is number of epsilons
+                W1 = np.zeros(6); err1 = np.zeros(6)
+                W2 = np.zeros(6); err2 = np.zeros(6)
+                W3 = np.zeros(6); err3 = np.zeros(6)
+                W4 = np.zeros(6); err4 = np.zeros(6)
+                W5 = np.zeros(6); err5 = np.zeros(6)
+                for i in range(6):
+                    W1[i] = data[i*10,step]; err1[i] = data[5+i*10,step]
+                    W2[i] = data[1+i*10,step]; err2[i] = data[6+i*10,step]
+                    W3[i] = data[2+i*10,step]; err3[i] = data[7+i*10,step]
+                    W4[i] = data[3+i*10,step]; err4[i] = data[8+i*10,step]
+                    W5[i] = data[4+i*10,step]; err5[i] = data[9+i*10,step]
+
+            plt.errorbar(eps,W1,err1,label='Error for APS')
+            plt.errorbar(eps,W2,err2,label='Error for KD')
+            plt.errorbar(eps,W3,err3,label='Error for APS with altered diffusion coefficient')
+            plt.errorbar(eps,W4,err4,label='Error for reverse APS with altered diffusion coefficient')
+            plt.errorbar(eps,W5,err5,label='Error for reverse APS')
+            plt.xscale('log')
+            plt.yscale('log')
+            plt.xlabel(r'$\epsilon$')
+            plt.ylabel('Wasserstein distance')
+            plt.legend()
+            plt.show()
+        else:
+            if not args.save_file:
+                sys.exit('If new results should be simulated then please save those results with "-sf" command')
+            if N is None:
+                N = 1_200_000
+            print(f'{N} paths used')
+            x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+            print('Exact is done')
+            # np.savetxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt',x_std)
+            # x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            W = np.zeros((5,dt_list.size))
+            err = np.zeros((5,dt_list.size))
+            test = x_std.copy()
+            W[0,:],err[0,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms)
+            print('APSMC is done')
+            W[1,:],err[1,:] = KDMC_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std)
+            print('KDMC is done')
+            W[2,:],err[2,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True)
+            print('APSMC is done, diff=True')
+            W[3,:],err[3,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=True,rev=True)
+            print('APSMC is done, diff=True, rev=True')
+            W[4,:],err[4,:] = APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,diff=False,rev=True)
+            print('APSMC is done, diff=False,rev=true')
+            with open(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt_post.txt','w') as f:
+                np.savetxt(f,np.vstack((W,err)))
+
+
     if one_step_dist:
         if N is None:
             N = 100_000
