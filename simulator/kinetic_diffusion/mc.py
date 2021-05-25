@@ -34,14 +34,17 @@ Nested =False,dR=None,boundary=None):
     R: collision rate
     SC: method for obtaining the next collision times
     '''
-    n = N
+    # n = N
     # r = x0.size
     # n_old = n
-    t = np.ones(n)*t0
+    t = np.ones(N)*t0
     # I = (t+tau)<T
     # index = np.argwhere(I).flatten()
-    I = np.ones(n)==1;tau = np.ones(n)*T
-    x,v,_ = Q(N)
+    I = np.ones(N)==1;tau = np.ones(N)*T
+    if x0 is None and v0 is None:
+        x,v,_ = Q(N)
+    else:
+        x = x0.copy();v=v0.copy()
     count = 0
     while True:
         e = np.random.exponential(1,size=np.sum(I,dtype=np.int64))
@@ -71,8 +74,11 @@ Nested =False,dR=None,boundary=None):
 
 @njit(nogil=True)
 def Kinetic(N,Q,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],
-M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],boundary=None):
-    x,v,_ = Q(N)
+M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],boundary=None,x0=None,v0=None):
+    if x0 is None and v0 is None:
+        x,v,_ = Q(N)
+    else:
+        x = x0.copy();v=v0.copy()
     t = t0*np.ones(N)
     I = np.ones(N)==1;tau = np.ones(N)*T
     while True:
@@ -91,32 +97,38 @@ M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:C
     return x
 
 @njit(nogil=True,parallel=True)
-def mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary):
+def mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
     cores = 64
     n = round(N/cores)
     x_KD = np.empty((cores,n))
     for i in prange(cores):
-        x_KD[i,:] = KDMC(dt,n,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
+        if x0 is None and v0 is None:
+            x_KD[i,:] = KDMC(dt,n,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
+        else:
+            x_KD[i,:] = KDMC(dt,n,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x0[i*n:(i+1)*n],v0[i*n:(i+1)*n])
     return x_KD.flatten()
 
 @njit(nogil=True,parallel=True)
-def mc2_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary):
+def mc2_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
     cores = 64
     n = round(N/cores)
     x_std = np.empty((cores,n))
     for i in prange(cores):
-        x_std[i,:] = Kinetic(n,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary)
+        if x0 is None and v0 is None:
+            x_std[i,:] = Kinetic(n,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary)
+        else:
+            x_std[i,:] = Kinetic(n,Q,t0,T,mu,sigma,M,R,SC,boundary=boundary,x0[i*n:(i+1)*n],v0[i*n:(i+1)*n])
     return x_std.flatten()
 
-def mc_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=None,boundary=None,x_std=None):
+def mc_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=None,boundary=None,x_std=None,x0=None,v0=None):
     '''Returns a wasserstein distance and the associated standard deviation'''
     W_out = np.zeros(dt_list.size); err = np.zeros(dt_list.size)
-    if x_std is None: x_std = mc2_par(80_000,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+    if x_std is None: x_std = mc2_par(80_000,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=x0,v0=v0)
     for j,dt in enumerate(dt_list):
         W = np.zeros(20)
         print(dt)
         for i in range(20):
-            x_KD = mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+            x_KD = mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=x0,v0=v0)
             W[i] = wasserstein_distance(x_KD,x_std)
         W_out[j] = np.mean(W); err[j] = np.std(W)
     return W_out,err
