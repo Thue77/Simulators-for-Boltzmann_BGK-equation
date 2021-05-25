@@ -820,7 +820,7 @@ if __name__ == '__main__':
             KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)
     if diffusion_limit:
         '''
-        epsilon= [1,0.32,0.1,0.032,0.01,0.005,0.001]
+        epsilon= [1,0.32,0.1,0.032,0.01,0.005]
         a = 0, b = 1
         '''
         T = 1;t0=0;dt_list=T/2**np.arange(0,7);M_t=2

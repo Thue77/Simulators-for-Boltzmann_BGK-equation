@@ -19,7 +19,7 @@ def __put_copy(self,arr,index,new):
 @njit(nogil=True)
 def KDMC(dt,N,Q,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],
 M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],
-Nested =False,dR=None,boundary=None):
+Nested =False,dR=None,boundary=None,x0=None,v0=None):
     '''
     dt: step size
     x0: initial positions
