@@ -9,9 +9,12 @@ import matplotlib.pyplot as plt
 
 
 @njit(nogil=True)
-def mc(dt,t0,T,N,eps,Q,M,r,boundary = None,sigma=None,rev=False,diff=False,v_ms=1):
+def mc(dt,t0,T,N,eps,Q,M,r,boundary = None,sigma=None,rev=False,diff=False,v_ms=1,x0=None,v0=None):
     t = t0
-    x,v,_ = Q(N)
+    if x0 is None and v0 is None:
+        x,v,_ = Q(N)
+    else:
+        x = x0.copy();v=v0.copy()
     while t<T:
         active = t<T
         z = np.random.normal(0,1,size=N); u = np.random.uniform(0,1,size=N)
@@ -80,9 +83,12 @@ def mc_adaptive(dt0,M_t,e2,N0,t0,T,N,eps,Q,M,r,F,boundary = None,density=False):
 
 
 @njit(nogil=True)
-def mc_standard(dt,t0,T,N,eps,Q,M,boundary,r):
+def mc_standard(dt,t0,T,N,eps,Q,M,boundary,r,x0=None,v0=None):
     t = t0
-    x,v,_ = Q(N)
+    if x0 is None and v0 is None:
+        x,v,_ = Q(N)
+    else:
+        x = x0.copy();v=v0.copy()
     while t<T:
         active = t<T
         # z = np.random.normal(0,1,size=N); u = np.random.uniform(0,1,size=N)
@@ -106,32 +112,38 @@ jit_module(nopython=True,nogil=True)
 
 
 @njit(nogil=True,parallel=True)
-def mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=False,diff=False,v_ms=1):
+def mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=False,diff=False,v_ms=1,x0=None,v0=None):
     cores = 64
     n = round(N/cores)
     x_AP = np.empty((cores,n))
     for i in prange(cores):
-        x_AP[i,:] = mc(dt,t0,T,n,eps,Q,M,r,boundary = boundary,rev=rev,diff=diff,v_ms=v_ms)
+        if x0 is None and v0 is None:
+            x_AP[i,:] = mc(dt,t0,T,n,eps,Q,M,r,boundary = boundary,rev=rev,diff=diff,v_ms=v_ms)
+        else:
+            x_AP[i,:] = mc(dt,t0,T,n,eps,Q,M,r,boundary = boundary,rev=rev,diff=diff,v_ms=v_ms,x0[i*n:(i+1)*n],v0[i*n:(i+1)*n])
     return x_AP.flatten()
 
 @njit(nogil=True,parallel=True)
-def mc2_par(dt,t0,T,N,eps,Q,M,boundary,r):
+def mc2_par(dt,t0,T,N,eps,Q,M,boundary,r,x0=None,v0=None):
     cores = 64
     n = round(N/cores)
     x_std = np.empty((cores,n))
     for i in prange(cores):
-        x_std[i,:] = mc_standard(dt,t0,T,n,eps,Q,M,boundary,r)
+        if x0 is None and v0 is None:
+            x_std[i,:] = mc_standard(dt,t0,T,n,eps,Q,M,boundary,r)
+        else:
+            x_std[i,:] = mc_standard(dt,t0,T,n,eps,Q,M,boundary,r,x0[i*n:(i+1)*n],v0[i*n:(i+1)*n])
     return x_std.flatten()
 
-def mc_density_test(dt_list,M_t,t0,T,N,eps,Q,M,r,F,boundary = None, x_std = None, N2 = None,rev=False,diff=False,v_ms=1):
+def mc_density_test(dt_list,M_t,t0,T,N,eps,Q,M,r,F,boundary = None, x_std = None, N2 = None,rev=False,diff=False,v_ms=1,x0=None,v0=None):
     '''Returns a wasserstein distance and the associated standard deviation'''
     W_out = np.zeros(dt_list.size); err = np.zeros(dt_list.size)
-    if x_std is None: x_std = mc2_par((T-t0)/2**20,t0,T,N2,eps,Q,M,boundary,r)
+    if x_std is None: x_std = mc2_par((T-t0)/2**20,t0,T,N2,eps,Q,M,boundary,r,x0,v0)
     for j,dt in enumerate(dt_list):
         W = np.zeros(20)
         print(dt)
         for i in range(20):
-            x_AP = mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=rev,diff=diff,v_ms=v_ms)
+            x_AP = mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=rev,diff=diff,v_ms=v_ms,x0,v0)
             W[i] = wasserstein_distance(x_AP,x_std)
         W_out[j] = np.mean(W); err[j] = np.std(W)
     return W_out,err
