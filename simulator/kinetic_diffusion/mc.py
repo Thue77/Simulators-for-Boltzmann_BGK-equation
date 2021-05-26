@@ -3,6 +3,7 @@ from .one_step import phi_KD,__psi_k
 from typing import Callable,Tuple
 from numba import njit
 from numba import prange
+import time
 from scipy.stats import wasserstein_distance
 
 '''Standard Monte Carlo method'''
@@ -122,13 +123,15 @@ def mc2_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
 
 def mc_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=None,boundary=None,x_std=None,x0=None,v0=None):
     '''Returns a wasserstein distance and the associated standard deviation'''
-    W_out = np.zeros(dt_list.size); err = np.zeros(dt_list.size)
+    W_out = np.zeros(dt_list.size); err = np.zeros(dt_list.size); cost = np.zeros(dt_list.size)
     if x_std is None: x_std = mc2_par(80_000,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=x0,v0=v0)
     for j,dt in enumerate(dt_list):
         W = np.zeros(20)
         print(dt)
+        start = time.perf_counter()
         for i in range(20):
             x_KD = mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=x0,v0=v0)
             W[i] = wasserstein_distance(x_KD,x_std)
+        cost[j] = time.perf_counter()-start
         W_out[j] = np.mean(W); err[j] = np.std(W)
     return W_out,err

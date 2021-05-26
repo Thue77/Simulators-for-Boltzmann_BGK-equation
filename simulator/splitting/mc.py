@@ -4,6 +4,7 @@ from .AddPaths import delta,x_hat,Sfunc
 import numpy as np
 from numba import njit,jit_module
 from numba import prange
+import time
 from scipy.stats import wasserstein_distance
 import matplotlib.pyplot as plt
 
@@ -113,7 +114,7 @@ jit_module(nopython=True,nogil=True)
 
 @njit(nogil=True,parallel=True)
 def mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=False,diff=False,v_ms=1,x0=None,v0=None):
-    cores = 64
+    cores = 8
     n = round(N/cores)
     x_AP = np.empty((cores,n))
     for i in prange(cores):
@@ -125,7 +126,7 @@ def mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=False,diff=False,v_ms=1,x0=None,v0=
 
 @njit(nogil=True,parallel=True)
 def mc2_par(dt,t0,T,N,eps,Q,M,boundary,r,x0=None,v0=None):
-    cores = 64
+    cores = 8
     n = round(N/cores)
     x_std = np.empty((cores,n))
     for i in prange(cores):
@@ -137,13 +138,15 @@ def mc2_par(dt,t0,T,N,eps,Q,M,boundary,r,x0=None,v0=None):
 
 def mc_density_test(dt_list,M_t,t0,T,N,eps,Q,M,r,F,boundary = None, x_std = None, N2 = None,rev=False,diff=False,v_ms=1,x0=None,v0=None):
     '''Returns a wasserstein distance and the associated standard deviation'''
-    W_out = np.zeros(dt_list.size); err = np.zeros(dt_list.size)
+    W_out = np.zeros(dt_list.size); err = np.zeros(dt_list.size); cost = np.zeros(dt_list.size)
     if x_std is None: x_std = mc2_par((T-t0)/2**20,t0,T,N2,eps,Q,M,boundary,r,x0=x0,v0=v0)
     for j,dt in enumerate(dt_list):
         W = np.zeros(20)
         print(dt)
+        start = time.perf_counter()
         for i in range(20):
             x_AP = mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=rev,diff=diff,v_ms=v_ms,x0=x0,v0=v0)
             W[i] = wasserstein_distance(x_AP,x_std)
+        cost[j] = time.perf_counter()-start
         W_out[j] = np.mean(W); err[j] = np.std(W)
-    return W_out,err
+    return W_out,err,cost
