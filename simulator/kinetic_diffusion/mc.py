@@ -134,4 +134,4 @@ def mc_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=None,boundary=None,x_std
             W[i] = wasserstein_distance(x_KD,x_std)
         cost[j] = time.perf_counter()-start
         W_out[j] = np.mean(W); err[j] = np.std(W)
-    return W_out,err
+    return W_out,err,cost

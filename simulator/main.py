@@ -630,6 +630,7 @@ if __name__ == '__main__':
                 print(f'{N} paths used for simulation')
                 x0,v0,_ = Q_nu(N)
                 x_std=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0,v0/epsilon)
+                cost = np.zeros((5,dt_list.size))
                 # x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
                 if args.save_file:
                     if post_collisional:
@@ -642,7 +643,7 @@ if __name__ == '__main__':
             else:
                 print('Done with exact')
                 # print(f'{N/10} paths used to estimate density with APSMC and KDMC')
-                W,err,cost=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,x0=x0,v0=v0)
+                W,err,cost[0,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,x0=x0,v0=v0)
             if args.save_file:
                 if post_collisional:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','w') as file:
@@ -650,15 +651,13 @@ if __name__ == '__main__':
                 else:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','w') as file:
                         np.savetxt(file,(W,err))
-                    with open(f'density_resultfile_cost_for_a={a}_b={b}_epsilon={epsilon}.txt','w') as file:
-                        np.savetxt(file,cost)
             plt.errorbar(dt_list,W,err,label='APS')
             if uf:
                 W = data[2]
                 err = data[3]
             else:
                 start = time.time()
-                W,err,cost=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,x0=x0,v0=v0)
+                W,err,cost[1,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,x0=x0,v0=v0)
                 print(f'APS with reverse one-step method is done. Time: {time.time()-start}')
             if args.save_file:
                 if post_collisional:
@@ -667,14 +666,12 @@ if __name__ == '__main__':
                 else:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
                         np.savetxt(file,(W,err))
-                    with open(f'density_resultfile_cost_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
-                        np.savetxt(file,cost)
             plt.errorbar(dt_list,W,err,label='RAPS')
             if uf:
                 W = data[4]
                 err = data[5]
             else:
-                W,err,cost = KDMC_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std,x0=x0,v0=v0/epsilon)
+                W,err,cost[2,:] = KDMC_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=dR,boundary=boundary,x_std=x_std,x0=x0,v0=v0/epsilon)
             if args.save_file:
                 if post_collisional:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','a') as file:
@@ -682,15 +679,13 @@ if __name__ == '__main__':
                 else:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
                         np.savetxt(file,(W,err))
-                    with open(f'density_resultfile_cost_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
-                        np.savetxt(file,cost)
             plt.errorbar(dt_list,W,err,label='KD')
             if uf:
                 W = data[6]
                 err = data[7]
             else:
                 start = time.time()
-                W,err,cost=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=False,diff=True,v_ms=v_ms,x0=x0,v0=v0)
+                W,err,cost[3,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=False,diff=True,v_ms=v_ms,x0=x0,v0=v0)
                 print(f'APS with altered diffusive coefficient is done. Time: {time.time()-start}')
             if args.save_file:
                 if post_collisional:
@@ -699,30 +694,39 @@ if __name__ == '__main__':
                 else:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
                         np.savetxt(file,(W,err))
-                    with open(f'density_resultfile_cost_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
-                        np.savetxt(file,cost)
             plt.errorbar(dt_list,W,err,label='APSD')
             if uf:
                 W = data[8]
                 err = data[9]
             else:
                 start = time.time()
-                W,err,cost=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,diff=True,x0=x0,v0=v0)
+                W,err,cost[4,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,diff=True,x0=x0,v0=v0)
                 print(f'APS with reverse one-step method and altered diffusive coeficient is done. Time: {time.time()-start}')
             if args.save_file:
                 if post_collisional:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','a') as file:
                         np.savetxt(file,(W,err))
+                    with open(f'density_resultfile_cost_for_a={a}_b={b}_epsilon={epsilon}_post.txt','w') as file:
+                        np.savetxt(file,cost)
                 else:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
                         np.savetxt(file,(W,err))
-                    with open(f'density_resultfile_cost_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
+                    with open(f'density_resultfile_cost_for_a={a}_b={b}_epsilon={epsilon}.txt','w') as file:
                         np.savetxt(file,cost)
             plt.errorbar(dt_list,W,err,label='RAPSD')
             plt.xscale('log')
             plt.yscale('log')
             plt.xlabel(r'$\Delta t$')
             plt.ylabel('Wasserstein distance')
+            plt.legend()
+            plt.figure()
+            names = ['APS','RAPS','KD','APSD','RAPSD']
+            for c,n in zip(cost,names):
+                plt.plot(dt_list[1:],c[1:],label=n)
+            plt.xscale('log')
+            plt.yscale('log')
+            plt.xlabel(r'$\Delta t$')
+            plt.ylabel('Wall clock time')
             plt.legend()
             plt.show()
     if radiative_transport:
