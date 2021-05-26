@@ -334,7 +334,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         logfile.write('\n')
         logfile.close()
 
-    if convergence:
+    if convergence and False:
         plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
         plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
         plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
