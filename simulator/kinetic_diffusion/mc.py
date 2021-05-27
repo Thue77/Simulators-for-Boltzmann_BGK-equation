@@ -99,7 +99,7 @@ M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:C
 
 @njit(nogil=True,parallel=True)
 def mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
-    cores = 64
+    cores = 8
     n = round(N/cores)
     x_KD = np.empty((cores,n))
     for i in prange(cores):
@@ -111,7 +111,7 @@ def mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
 
 @njit(nogil=True,parallel=True)
 def mc2_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
-    cores = 64
+    cores = 8
     n = round(N/cores)
     x_std = np.empty((cores,n))
     for i in prange(cores):
@@ -124,7 +124,9 @@ def mc2_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
 def mc_density_test(dt_list,Q,t0,T,N,mu,sigma,M,R,SC,dR=None,boundary=None,x_std=None,x0=None,v0=None):
     '''Returns a wasserstein distance and the associated standard deviation'''
     W_out = np.zeros(dt_list.size); err = np.zeros(dt_list.size); cost = np.zeros(dt_list.size)
-    if x_std is None: x_std = mc2_par(80_000,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=x0,v0=v0)
+    if x0 is None and v0 is None:
+        x0,v0,_ = Q(N)
+    if x_std is None: x_std = mc2_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=x0,v0=v0)
     for j,dt in enumerate(dt_list):
         W = np.zeros(20)
         print(dt)
