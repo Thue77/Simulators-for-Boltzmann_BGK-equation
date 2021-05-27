@@ -68,7 +68,7 @@ def improved_corr(dt_f,M_t,eps,x_f,x_c,v_all,v_c,z,r,first_level):
 
 '''My correlation with inspiration from strang splitting'''
 @njit(nogil=True)
-def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False):
+def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False,std=False):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
     t: starting time
@@ -79,24 +79,54 @@ def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False
     '''
     dt_c = dt_f*M_t
     first_level = np.abs(T-dt_c)<1e-7
-    # if first_level:
-    #     print(f'dt_f: {dt_f}, dt_c: {dt_c}, M_t: {M_t}')
     x_f,v_f,_ = Q(N)
     x_c = x_f.copy()
-    v_bar_c = v_f.copy()
     v_c = v_f.copy()
     while t<T:
+        if std:
+            '''Indicates that the velocity to be used in the coarse step still needs
+            to be updated found, i.e. no collision has happened yet'''
+            I = np.ones(N)
+        v_bar_c = np.zeros(N)#v_f.copy()
         v_bar_all = np.zeros((N,M_t))
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
         for m in range(M_t):
             C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
             x_f,v_f,v_bar_f = phi_APS_new(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary,diff=diff)
-            v_bar_all[C[:,m],m] = v_f[C[:,m]]
-        v_bar_c,z_c = cor_rv(M_t,Z,C,v_bar_all)
+            if std:
+                v_bar_c = v_f*C*I
+                I[np.where(C==1)[0]]=0
+            else:
+                v_bar_all[C[:,m],m] = v_f[C[:,m]]
+        if not std:
+            v_bar_c,z_c = cor_rv(M_t,Z,C,v_bar_all)
+        else:
+            z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
         u_c = max_np(U,axis=1)**M_t
         x_c,v_c,_ = phi_APS_new(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary,diff=diff)
         t += dt_c
     return x_f,x_c
+
+# def cor_std(v_bar_all,Z,M_t,N):
+#     '''Until the first collision, the entries in v_bar '''
+#     #Indexes for paths for which no collisions have occured
+#     I_nc = np.argwhere(np.sum(v_bar_all,axis=1)==0)[0]
+#     '''Indicates in which step the first collision happens, but needs to be
+#     corrected according to I_nc'''
+#     I_fc = (v_bar_all!=0).argmax(axis=1)
+#
+#     '''Need to find first index in each row where v_bar_all is non-zero'''
+#     I = np.ones(N)*M_t
+#     for m in range(M_t):
+#         '''index_col contains the index of the current column if v_bar_all is
+#         non-zero and if v_bar_all=0 then index_col=M_t'''
+#         index_col = m*(v_bar_all[:,m]!=0)
+#         index_col[index_col==0] = M_t
+#         '''If index_col=m then I=m otherwise I remains unchanged'''
+#         I = np.minimum(I,index_col)
+#     '''The relevant column for each'''
+#
+#     index_col = = np.sum(v_bar_all>0)
 
 @njit(nogil=True,parallel=True)
 def cor_rv(M_t,Z,C,v_bar_all):
@@ -116,7 +146,7 @@ def cor_rv(M_t,Z,C,v_bar_all):
     #number of steps affected by collisions
     steps = np.count_nonzero(C_a>0,axis=1)
     #number of steps that each collision affects. count[0,1]: number of steps affected by second collision for path 0
-    temp = np.zeros_like(v_bar_all).astype(np.int64)
+    temp = np.zeros((n,M_t)).astype(np.int64)
     # i_c = np.zeros(M_t,dtype=np.int64)
     for i in prange(M_t):
         temp[:,i] = np.count_nonzero(C_a==i+1,axis=1)
@@ -132,7 +162,7 @@ def cor_rv(M_t,Z,C,v_bar_all):
 
 
     # print(f'count={count}, steps = {steps}')
-    theta = np.zeros_like(v_bar_all)
+    theta = np.zeros((n,M_t))
     '''Cannot divide with steps for paths where no collisions occurs'''
     index = np.where(steps>0)[0]
     theta[index,:] = (count[index,:].T/steps[index]).T
@@ -143,6 +173,8 @@ def cor_rv(M_t,Z,C,v_bar_all):
     # print(f'output: {np.sum(np.sqrt(theta)*v_bar_all,axis=1)}')
 
     return np.sum(np.sqrt(theta)*v_bar_all,axis=1),z
+
+
 @njit(nogil=True)
 def put_np(count,temp,M_t):
     # print(f'temp: {temp}')
@@ -348,22 +380,22 @@ def add_sum_of_squares_alongaxis(A,A_mean,N,axis=0):
 
 
 if __name__ == '__main__':
-    model = 'Goldstein-Taylor'
-    @njit(nogil=True)
-    def B(x,model='Goldstein-Taylor'):
-        '''
-        Distribution of V_bar
-        '''
-        if model == 'Goldstein-Taylor':
-            U = np.random.uniform(0,1,size=len(x))
-            v_bar =  (U <= 0.5).astype(np.float64) - (U > 0.5).astype(np.float64)#np.random.normal(size=len(x))
-        else:
-            v_bar = np.ones(len(x))#np.random.normal(size=len(x))
-            print('here')
-        return v_bar,v_bar
-    @njit(nogil=True)
-    def Q(N):
-        return (np.zeros(N),1,np.ones(N))
+    # model = 'Goldstein-Taylor'
+    # @njit(nogil=True)
+    # def B(x,model='Goldstein-Taylor'):
+    #     '''
+    #     Distribution of V_bar
+    #     '''
+    #     if model == 'Goldstein-Taylor':
+    #         U = np.random.uniform(0,1,size=len(x))
+    #         v_bar =  (U <= 0.5).astype(np.float64) - (U > 0.5).astype(np.float64)#np.random.normal(size=len(x))
+    #     else:
+    #         v_bar = np.ones(len(x))#np.random.normal(size=len(x))
+    #         print('here')
+    #     return v_bar,v_bar
+    # @njit(nogil=True)
+    # def Q(N):
+    #     return (np.zeros(N),1,np.ones(N))
     # dt_f=0.2;M_t=5;t=0;T=10;N=10_000;eps=0.5
     # x_f,x_c = correlated(dt_f,M_t,t,T,eps,N,lambda N: (np.zeros(N),1,np.ones(N)),B,plot_var=True)
     if True:
@@ -392,3 +424,8 @@ if __name__ == '__main__':
         A = np.zeros((2,3))
         A_mean = np.array([[2,4,6],[0,0,0]])
         print(add_sum_of_squares_alongaxis(A,A_mean,N=1)[1])
+
+    a=np.array([[0,1,2,3],[0,0,0,0],[1,0,0,3],[0,2,0,5]])
+    C= (a!=0)
+    Z = np.array([1,2,3,4])
+    v,_ = cor_rv(4,Z,C,a)
