@@ -86,7 +86,7 @@ def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False
         if std:
             '''Indicates that the velocity to be used in the coarse step still needs
             to be updated found, i.e. no collision has happened yet'''
-            I = np.ones(N)
+            I = np.ones(N,dtype=np.int64)
         v_bar_c = np.zeros(N)#v_f.copy()
         v_bar_all = np.zeros((N,M_t))
         Z = np.random.normal(0,1,size=(N,M_t)); U = np.random.uniform(0,1,size=(N,M_t))
@@ -94,8 +94,9 @@ def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False
             C = (U.T>=eps**2/(eps**2+dt_f*r(x_f))).T #Indicates if collisions happen
             x_f,v_f,v_bar_f = phi_APS_new(x_f,v_f,dt_f,eps,Z[:,m],U[:,m],B,r=r,boundary=boundary,diff=diff)
             if std:
-                v_bar_c = v_f*C*I
-                I[np.where(C==1)[0]]=0
+                index = np.where(I)[0]
+                v_bar_c[index] = v_f[index]*C[index,m]
+                I[np.where(C[:,m]==1)[0]]=0
             else:
                 v_bar_all[C[:,m],m] = v_f[C[:,m]]
         if not std:
