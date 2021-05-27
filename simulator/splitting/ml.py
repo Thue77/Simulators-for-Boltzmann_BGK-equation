@@ -38,7 +38,7 @@ def rnd1(x, decimals, out):
     return np.round_(x, decimals, out).astype(np.int64)
 
 @njit(nogil=True,parallel=True)
-def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1,rev=False,diff=False,v_ms=1):
+def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1,rev=False,diff=False,v_ms=1,std=False):
     # levels = ll.copy()
     cores = 8
     n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff)).astype(np.int64))
@@ -53,7 +53,7 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
                     with objmode(start1 = 'f8'):
                         start1 = time.perf_counter()
                     if rev:
-                        x_f,x_c = correlated_ts(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy,diff=diff)
+                        x_f,x_c = correlated_ts(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy,diff=diff,std=std)
                     else:
                         x_f,x_c = correlated(dt_f,M_t,t0,T,eps,n[i],Q,M,r,boundary=boundary,strategy=strategy,diff=diff)
                     with objmode(end1 = 'f8'):
@@ -88,7 +88,7 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
 
 
 @njit(nogil=True)
-def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,beta=None,gamma=None,rev=False,diff=False,v_ms=1):
+def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,beta=None,gamma=None,rev=False,diff=False,v_ms=1,std=False):
     '''
     e2: bound on mean square error
     Q: initial distribution
@@ -118,7 +118,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*8_000_000)
             # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
-            E,SS,N,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy,rev=rev,diff=diff,v_ms=v_ms)
+            E,SS,N,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy,rev=rev,diff=diff,v_ms=v_ms,std=std)
             V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
             N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
@@ -164,7 +164,7 @@ def lin_fit(x,y):
 
 
 @njit(nogil=True,parallel=True)
-def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False,diff=False,v_ms=1):
+def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False,diff=False,v_ms=1,std=False):
     '''Calculates values for consistency test for each level given by dt_list'''
     cores = 8 #Controls parrelisation
 
@@ -199,7 +199,7 @@ def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False
                 with objmode(start1 = 'f8'):
                     start1 = time.perf_counter()
                 if rev:
-                    x_f,x_c = correlated_ts(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary,diff=diff)
+                    x_f,x_c = correlated_ts(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary,diff=diff,std=std)
                 else:
                     x_f,x_c = correlated(dt_list[l+1],M_t,t0,T,eps,n,Q,M,r,boundary=boundary,diff=diff,v_ms=v_ms)
                 with objmode(end1 = 'f8'):
@@ -236,7 +236,7 @@ jit_module(nopython=True,nogil=True)
 
 
 
-def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=1,convergence=True,complexity=True,rev=False,diff=False,v_ms=1):
+def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=1,convergence=True,complexity=True,rev=False,diff=False,v_ms=1,std=False):
     ''''
     filename for logfile should always begin with 'logfile_APS'
 
@@ -277,7 +277,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
 
     if convergence:
         print('Convergence test')
-        b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary=boundary,strategy=strategy,rev=rev,diff=diff,v_ms=v_ms)
+        b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary=boundary,strategy=strategy,rev=rev,diff=diff,v_ms=v_ms,std=std)
         print('Convergence test DONE')
         if save_file:
             for i in range(dt_list.size):
