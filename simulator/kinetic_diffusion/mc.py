@@ -46,7 +46,6 @@ Nested =False,dR=None,boundary=None,x0=None,v0=None):
         x,v,_ = Q(N)
     else:
         x = x0.copy();v=v0.copy()
-    count = 0
     while True:
         e = np.random.exponential(1,size=np.sum(I,dtype=np.int64))
         tau[I] = SC(x[I],v[I],e)
@@ -64,7 +63,6 @@ Nested =False,dR=None,boundary=None,x0=None,v0=None):
         # t[index] = t_temp; x[index] = x_temp; v[index] = v_temp
         # I = (t+tau)<T
         # index = np.argwhere(I).flatten()
-        count += 1
     I = t<T
     if np.sum(I)>0: #Move the rest of the particles kinetically to the end
         index = np.argwhere(I).flatten()
