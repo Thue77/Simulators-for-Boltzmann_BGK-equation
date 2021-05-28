@@ -495,16 +495,39 @@ if __name__ == '__main__':
             if not rev and not diff:
                 (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
             else:
-                (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            plt.plot(range(1,dt_list.size),var2[1:],':',label='var(F(X^f)-F(X^c))')
-            plt.plot(range(dt_list.size),var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
-            plt.plot(range(1,dt_list.size),np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
-            plt.plot(range(dt_list.size),v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
-            plt.title(f'Plot of variance and bias')
-            # plt.xscale('log')
-            plt.yscale('log')
-            plt.xlabel('Levels')
+                if std:
+                    (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_std_for_a={a}_b={b}_epsilon={epsilon}.txt')
+                else:
+                    (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
+
+            '''Find index where they transition'''
+            i = 1
+            old = 0
+            for va in var2[1:]:
+                if va < old:
+                    break
+                i+=1
+                old=va
+            print(f'dt: {dt_list[i]}, index: {i}')
+            print(f'var: {var2}')
+            print(f'bias: {bias}')
+            print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
+            print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
+            print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
+            print(f'slope of bias after:{np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)}')
+
+            fig,ax = plt.subplots()
+            ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
+            ax.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
+            ax.plot(dt_list[1:],np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
+            ax.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
+            ax.set_title(f'Plot of variance and bias')
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+            ax.set_xlim(max(dt_list),min(dt_list))
+            ax.set_xlabel(r'$\Delta t$')
             plt.legend()
+            # plt.savefig(f'var_APS_diff_{diff}_rev_{rev}_std_{std}_eps_{epsilon}_a_{a}_b_{b}.png')
             plt.figure()
             plt.plot(range(1,dt_list.size),kur1[1:],':')
             plt.xlabel('Levels')
@@ -515,6 +538,7 @@ if __name__ == '__main__':
             plt.title(f'Plot check of consistency')
             plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
             plt.xlabel('Levels')
+            # plt.show()
 
             # dfs = {}
             # for e2 in E2:
@@ -524,7 +548,6 @@ if __name__ == '__main__':
             #         dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
             #     print(dfs[e2])
 
-            plt.show()
         else:
             if N is None:
                 N = 120_000
@@ -551,15 +574,35 @@ if __name__ == '__main__':
         E2=0.01/2**np.arange(0,13)
         if uf:
             (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            plt.plot(range(1,dt_list.size),var2[1:],':',label='var(F(X^f)-F(X^c))')
-            plt.plot(range(dt_list.size),var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
-            plt.plot(range(1,dt_list.size),np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
-            plt.plot(range(dt_list.size),v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
-            plt.title(f'Plot of variance and bias')
-            plt.xlabel('Levels')
-            # plt.xscale('log')
-            plt.yscale('log')
+
+            '''Find index where they transition'''
+            i = 1
+            old = 0
+            for va in var2[1:]:
+                if va < old:
+                    break
+                i+=1
+                old=va
+            print(f'dt: {dt_list[i]}, index: {i}')
+            print(f'var: {var2}')
+            print(f'bias: {bias}')
+            print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
+            print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
+            print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
+            print(f'slope of bias after:{np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)}')
+
+            fig,ax = plt.subplots()
+            ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
+            ax.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
+            ax.plot(dt_list[1:],np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
+            ax.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
+            ax.set_title(f'Plot of variance and bias')
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+            ax.set_xlim(max(dt_list),min(dt_list))
+            ax.set_xlabel(r'$\Delta t$')
             plt.legend()
+            plt.savefig(f'var_KD_eps_{epsilon}_a_{a}_b_{b}.png')
             plt.figure()
             plt.plot(range(1,dt_list.size),kur1[1:],':')
             plt.xlabel('Levels')
@@ -570,11 +613,11 @@ if __name__ == '__main__':
             plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
             plt.xlabel('Levels')
             plt.title(f'Plot check of consistency')
+            # plt.show()
             # dfs = {}
             # for e2 in E2:
             #     dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
             #     print(dfs[e2])
-            plt.show()
 
         else:
             if N is None:
