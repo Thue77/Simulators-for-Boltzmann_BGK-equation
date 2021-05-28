@@ -292,7 +292,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=None,dR=None,tau=None,L=14,N_warm = 100,
 @njit(nogil=True,parallel=True)
 def convergence_tests(N,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary):
     '''Calculates values for consistency test for each level given by dt_list'''
-    cores = 8 #Controls parrelisation
+    cores = 64 #Controls parrelisation
 
     L = dt_list.size
     # sys.exit()

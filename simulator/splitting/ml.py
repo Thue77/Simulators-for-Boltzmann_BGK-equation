@@ -166,7 +166,7 @@ def lin_fit(x,y):
 @njit(nogil=True,parallel=True)
 def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False,diff=False,v_ms=1,std=False):
     '''Calculates values for consistency test for each level given by dt_list'''
-    cores = 8 #Controls parrelisation
+    cores = 64 #Controls parrelisation
 
     L = dt_list.size
     b = np.zeros(L) #mean(F(x^f)-F(X^c))
