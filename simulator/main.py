@@ -602,7 +602,7 @@ if __name__ == '__main__':
             ax.set_xlim(max(dt_list),min(dt_list))
             ax.set_xlabel(r'$\Delta t$')
             plt.legend()
-            plt.savefig(f'var_KD_eps_{epsilon}_a_{a}_b_{b}.png')
+            # plt.savefig(f'var_KD_eps_{epsilon}_a_{a}_b_{b}.png')
             plt.figure()
             plt.plot(range(1,dt_list.size),kur1[1:],':')
             plt.xlabel('Levels')
