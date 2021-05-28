@@ -100,7 +100,7 @@ def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False
             else:
                 v_bar_all[C[:,m],m] = v_f[C[:,m]]
         if not std:
-            v_bar_c,z_c = cor_rv(M_t,Z,C,v_bar_all)
+            v_bar_c,z_c = new(M_t,Z,v_bar_all)#cor_rv(M_t,Z,C,v_bar_all)
         else:
             z_c = 1/np.sqrt(M_t)*np.sum(Z,axis=1)
         u_c = max_np(U,axis=1)**M_t
@@ -174,7 +174,60 @@ def cor_rv(M_t,Z,C,v_bar_all):
     # print(f'output: {np.sum(np.sqrt(theta)*v_bar_all,axis=1)}')
 
     return np.sum(np.sqrt(theta)*v_bar_all,axis=1),z
+@njit(nogil=True)
+def rnd1(x, decimals, out):
+    return np.round_(x, decimals, out).astype(np.int64)
 
+
+@njit(nogil=True)
+def new(M_t,Z,v_bar_all):
+    n = v_bar_all.shape[0]
+    # remainder = np.mod(n,np.arange(2,9))
+    # if 0 in remainder:
+    #     split = np.where(remainder==0)[0][-1]+2
+    #     ns = round(n/split)
+    #     out = np.zeros(n)
+    #     for i in prange(split):
+    #         C = v_bar_all[i*ns:(i+1)*ns,:]!=0
+    #         C_sum = np.zeros((ns,M_t))
+    #         for j in range(ns):
+    #             C_sum[j,:] = np.cumsum(C[j,:])
+    #         rows_old = np.unique(np.where(C)[0]); rows = rows_old.copy()
+    #         steps = np.count_nonzero(C_sum,axis=1).astype(np.int64)
+    #         # print(steps)
+    #         start = M_t - steps
+    #         total = np.zeros(ns); current = v_bar_all[i*ns:(i+1)*ns,0]; weights = np.ones(ns); col = np.zeros(ns)
+    #         for m in range(M_t):
+    #             I_nc = v_bar_all[i*ns:(i+1)*ns,m]==0; I_c = np.logical_not(I_nc)
+    #             col += I_c
+    #             total[rows] = total[rows] + (current[rows]*np.sqrt(weights[rows]/steps[rows]) )*I_c[rows]*(col[rows]>1)
+    #             # print(f'total: {total}, current: {current}, weights: {weights}')
+    #             weights = (I_nc)*(weights+1) +  np.ones(n)*I_c
+    #             current =  (I_nc)*(current) +  v_bar_all[i*ns:(i+1)*ns,m]*I_c
+    #         # print(f'OUT: total: {total}, current: {current}, weights: {weights}')
+    #         total[rows] = total[rows] + current[rows]*np.sqrt(weights[rows]/steps[rows])*(col[rows]>=1)
+    #         out[i*ns:(i+1)*ns] = total
+    #     return out,np.sqrt(1/M_t)*np.sum(Z,axis=1)
+    # else:
+    C = v_bar_all!=0
+    C_sum = np.zeros((n,M_t))
+    for j in prange(n):
+        C_sum[j,:] = np.cumsum(C[j,:])
+    rows_old = np.unique(np.where(C)[0]); rows = rows_old.copy()
+    steps = np.count_nonzero(C_sum,axis=1).astype(np.int64)
+    # print(steps)
+    start = M_t - steps
+    total = np.zeros(n); current = v_bar_all[:,0]; weights = np.ones(n); col = np.zeros(n)
+    for m in range(M_t):
+        I_nc = v_bar_all[:,m]==0; I_c = np.logical_not(I_nc)
+        col += I_c
+        total[rows] = total[rows] + (current[rows]*np.sqrt(weights[rows]/steps[rows]) )*I_c[rows]*(col[rows]>1)
+        # print(f'total: {total}, current: {current}, weights: {weights}')
+        weights = (I_nc)*(weights+1) +  np.ones(n)*I_c
+        current =  (I_nc)*(current) +  v_bar_all[:,m]*I_c
+    # print(f'OUT: total: {total}, current: {current}, weights: {weights}')
+    total[rows] = total[rows] + current[rows]*np.sqrt(weights[rows]/steps[rows])*(col[rows]>=1)
+    return total,np.sqrt(1/M_t)*np.sum(Z,axis=1)
 
 @njit(nogil=True)
 def put_np(count,temp,M_t):
