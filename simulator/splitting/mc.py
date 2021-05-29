@@ -114,7 +114,7 @@ jit_module(nopython=True,nogil=True)
 
 @njit(nogil=True,parallel=True)
 def mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=False,diff=False,v_ms=1,x0=None,v0=None):
-    cores = 8
+    cores = 64
     n = round(N/cores)
     x_AP = np.empty((cores,n))
     for i in prange(cores):
@@ -126,7 +126,7 @@ def mc1_par(dt,t0,T,N,eps,Q,M,boundary,r,rev=False,diff=False,v_ms=1,x0=None,v0=
 
 @njit(nogil=True,parallel=True)
 def mc2_par(dt,t0,T,N,eps,Q,M,boundary,r,x0=None,v0=None):
-    cores = 8
+    cores = 64
     n = round(N/cores)
     x_std = np.empty((cores,n))
     for i in prange(cores):
