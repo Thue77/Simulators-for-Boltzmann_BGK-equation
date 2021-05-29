@@ -329,11 +329,11 @@ def SC(x,v,e):
                     dtau[index] = dtau[index] + (x_b-x_new[index])/v[index]
                     # print('dtau')
                     # print(dtau)
-                    temp = np.zeros(n); temp[index] =True# np.put(temp,index,1)
+                    temp = np.zeros(n).astype(np.bool_); temp[index] =True# np.put(temp,index,1)
                     # print('temp')
                     # print(temp)
                 else:
-                    temp = np.zeros_like(A)
+                    temp = np.zeros(n).astype(np.bool_)
                 I_s = np.logical_not(temp)*A
                 # print('I_s')
                 # print(I_s)
