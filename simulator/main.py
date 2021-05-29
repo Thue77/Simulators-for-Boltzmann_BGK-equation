@@ -487,10 +487,10 @@ if __name__ == '__main__':
             path = path+ sep+args.folder
             os.chdir(path)
         except FileNotFoundError:
-            print('Give the separator that fits with your operating system. It is done by adding the argument -sep "your_separator"')
+            print('Maybe the separator is wrong. Give the separator that fits with your operating system. It is done by adding the argument -sep "your_separator"')
             raise
     if ml_test_APS:
-        E2=0.01/2**np.arange(0,13)
+        E2=0.01/2**np.arange(0,16)
         if uf:
             if not rev and not diff:
                 (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
@@ -514,7 +514,8 @@ if __name__ == '__main__':
             print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
             print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
             print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
-            print(f'slope of bias after:{np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)}')
+            print(f'slope of bias after:{np.polyfit(range(i,bias.size),np.log2(np.abs(bias[i:])),1)}')
+            print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
 
             fig,ax = plt.subplots()
             ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
@@ -527,6 +528,14 @@ if __name__ == '__main__':
             ax.set_xlim(max(dt_list),min(dt_list))
             ax.set_xlabel(r'$\Delta t$')
             plt.legend()
+            fig2,ax2 = plt.subplots()
+            ax2.plot(dt_list[1:],cost2[1:],':')
+            ax2.set_xscale('log')
+            ax2.set_yscale('log')
+            ax2.set_xlim(max(dt_list),min(dt_list))
+            ax2.set_xlabel(r'$\Delta t$')
+            ax2.set_ylabel(r'Wall clock time per path')
+            # plt.legend()
             # plt.savefig(f'var_APS_diff_{diff}_rev_{rev}_std_{std}_eps_{epsilon}_a_{a}_b_{b}.png')
             plt.figure()
             plt.plot(range(1,dt_list.size),kur1[1:],':')
@@ -538,7 +547,7 @@ if __name__ == '__main__':
             plt.title(f'Plot check of consistency')
             plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
             plt.xlabel('Levels')
-            # plt.show()
+            plt.show()
 
             # dfs = {}
             # for e2 in E2:
@@ -567,9 +576,9 @@ if __name__ == '__main__':
                     logfile = open(f'logfile_APS_rev_{rev}_diff_{diff}_std_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            start = time.perf_counter()
-            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False,rev=rev,diff=diff,v_ms=v_ms,std=std)
-            print(f'time: {time.perf_counter()-start}')
+            # start = time.perf_counter()
+            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False,convergence=True,rev=rev,diff=diff,v_ms=v_ms,std=std)
+            # print(f'time: {time.perf_counter()-start}')
     if ml_test_KD:
         E2=0.01/2**np.arange(0,13)
         if uf:
@@ -590,6 +599,7 @@ if __name__ == '__main__':
             print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
             print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
             print(f'slope of bias after:{np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)}')
+            print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
 
             fig,ax = plt.subplots()
             ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
@@ -602,6 +612,13 @@ if __name__ == '__main__':
             ax.set_xlim(max(dt_list),min(dt_list))
             ax.set_xlabel(r'$\Delta t$')
             plt.legend()
+            fig2,ax2 = plt.subplots()
+            ax2.plot(dt_list[1:],cost2[1:],':')
+            ax2.set_xscale('log')
+            ax2.set_yscale('log')
+            ax2.set_xlim(max(dt_list),min(dt_list))
+            ax2.set_xlabel(r'$\Delta t$')
+            plt.legend()
             # plt.savefig(f'var_KD_eps_{epsilon}_a_{a}_b_{b}.png')
             plt.figure()
             plt.plot(range(1,dt_list.size),kur1[1:],':')
@@ -613,7 +630,7 @@ if __name__ == '__main__':
             plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
             plt.xlabel('Levels')
             plt.title(f'Plot check of consistency')
-            # plt.show()
+            plt.show()
             # dfs = {}
             # for e2 in E2:
             #     dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
