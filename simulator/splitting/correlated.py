@@ -210,24 +210,31 @@ def new(M_t,Z,v_bar_all):
     #     return out,np.sqrt(1/M_t)*np.sum(Z,axis=1)
     # else:
     C = v_bar_all!=0
-    C_sum = np.zeros((n,M_t))
-    for j in prange(n):
-        C_sum[j,:] = np.cumsum(C[j,:])
+    # C_sum = np.zeros((n,M_t))
+    # for j in prange(n):
+    #     C_sum[j,:] = np.cumsum(C[j,:])
     rows_old = np.unique(np.where(C)[0]); rows = rows_old.copy()
-    steps = np.count_nonzero(C_sum,axis=1).astype(np.int64)
-    # print(steps)
-    start = M_t - steps
-    total = np.zeros(n); current = v_bar_all[:,0]; weights = np.ones(n); col = np.zeros(n)
-    for m in range(M_t):
-        I_nc = v_bar_all[:,m]==0; I_c = np.logical_not(I_nc)
-        col += I_c
-        total[rows] = total[rows] + (current[rows]*np.sqrt(weights[rows]/steps[rows]) )*I_c[rows]*(col[rows]>1)
-        # print(f'total: {total}, current: {current}, weights: {weights}')
-        weights = (I_nc)*(weights+1) +  np.ones(n)*I_c
-        current =  (I_nc)*(current) +  v_bar_all[:,m]*I_c
-    # print(f'OUT: total: {total}, current: {current}, weights: {weights}')
-    total[rows] = total[rows] + current[rows]*np.sqrt(weights[rows]/steps[rows])*(col[rows]>=1)
-    return total,np.sqrt(1/M_t)*np.sum(Z,axis=1)
+    if M_t > 3:
+        steps = np.count_nonzero(C_sum,axis=1).astype(np.int64)
+        # print(steps)
+        start = M_t - steps
+        total = np.zeros(n); current = v_bar_all[:,0]; weights = np.ones(n); col = np.zeros(n)
+        for m in range(M_t):
+            I_nc = v_bar_all[:,m]==0; I_c = np.logical_not(I_nc)
+            col += I_c
+            total[rows] = total[rows] + (current[rows]*np.sqrt(weights[rows]/steps[rows]) )*I_c[rows]*(col[rows]>1)
+            # print(f'total: {total}, current: {current}, weights: {weights}')
+            weights = (I_nc)*(weights+1) +  np.ones(n)*I_c
+            current =  (I_nc)*(current) +  v_bar_all[:,m]*I_c
+        # print(f'OUT: total: {total}, current: {current}, weights: {weights}')
+        total[rows] = total[rows] + current[rows]*np.sqrt(weights[rows]/steps[rows])*(col[rows]>=1)
+        return total,np.sqrt(1/M_t)*np.sum(Z,axis=1)
+    else:
+        out=np.zeros(n)
+        out_z=np.sqrt(1/M_t)*np.sum(Z,axis=1)
+        out[rows] = np.sqrt(1/np.sum(C[rows],axis=1))*np.sum(v_bar_all[rows],axis=1)
+        # out_z[rows] = 1/np.sqrt(2)*(np.sqrt(1/np.sum(C[rows],axis=1))*np.sum(v_bar_all[rows],axis=1)+np.sqrt(1/M_t)*np.sum(Z[rows],axis=1))
+        return out,out_z
 
 @njit(nogil=True)
 def put_np(count,temp,M_t):
