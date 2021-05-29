@@ -439,12 +439,14 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             levels=None
 
         data = {}
+        # levels = np.array([0,1,12,13]) One coarse level
+        levels = np.array([6,7,8,9])
         pd.set_option('max_columns',None)
         for e2 in E2:
             print(f'MSE: {e2}')
             start = time.time()
 
-            E,V,C,N,levels_out = ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=alpha,levels=levels)
+            E,V,C,N,levels_out = ml(e2,Q,t0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.15,levels=levels)
             print(f'Time: {time.time()-start}')
             data[e2] = {'dt':(T-t0)/2**levels_out,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
             df = pd.DataFrame(data[e2])

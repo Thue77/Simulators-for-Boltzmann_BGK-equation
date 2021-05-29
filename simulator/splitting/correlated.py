@@ -210,11 +210,11 @@ def new(M_t,Z,v_bar_all):
     #     return out,np.sqrt(1/M_t)*np.sum(Z,axis=1)
     # else:
     C = v_bar_all!=0
-    # C_sum = np.zeros((n,M_t))
-    # for j in prange(n):
-    #     C_sum[j,:] = np.cumsum(C[j,:])
     rows_old = np.unique(np.where(C)[0]); rows = rows_old.copy()
     if M_t > 3:
+        C_sum = np.zeros((n,M_t))
+        for j in prange(n):
+            C_sum[j,:] = np.cumsum(C[j,:])
         steps = np.count_nonzero(C_sum,axis=1).astype(np.int64)
         # print(steps)
         start = M_t - steps

@@ -577,10 +577,10 @@ if __name__ == '__main__':
             else:
                 logfile=None
             # start = time.perf_counter()
-            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False,convergence=True,rev=rev,diff=diff,v_ms=v_ms,std=std)
+            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,convergence=False,rev=rev,diff=diff,v_ms=v_ms,std=std)
             # print(f'time: {time.perf_counter()-start}')
     if ml_test_KD:
-        E2=0.01/2**np.arange(0,13)
+        E2=0.01/2**np.arange(0,16)
         if uf:
             (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
 
@@ -639,12 +639,12 @@ if __name__ == '__main__':
         else:
             if N is None:
                 N = 120_000
-            N0=16; T=1; dt_list = T/2**np.arange(0,17,1); E2=0.01/2**np.arange(0,13); t0=0
+            N0=16; T=1; dt_list = T/2**np.arange(0,17,1); t0=0
             if args.save_file:
                 logfile = open(f'logfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)
+            KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=True,convergence=False)
     if goldstein_taylor:
         if N is None:
             N=120_000;
