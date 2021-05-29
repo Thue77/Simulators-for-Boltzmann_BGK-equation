@@ -645,6 +645,15 @@ if __name__ == '__main__':
             else:
                 logfile=None
             KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=True,convergence=False)
+            # start1 = time.perf_counter()
+            # dt_list = np.array([1/2**6,1/2**7])
+            # KD_conv(8,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary)
+            # end1 = time.perf_counter()
+            # print((end1-start1)/2)
+            # # start1 = time.perf_counter()
+            # b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = KD_conv(N,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary)
+            # # end1 = time.perf_counter()
+            # print(cost2)
     if goldstein_taylor:
         if N is None:
             N=120_000;
@@ -715,8 +724,8 @@ if __name__ == '__main__':
             else:
                 print('Done with exact')
                 # print(f'{N/10} paths used to estimate density with APSMC and KDMC')
-                W,err,cost[0,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,x0=x0,v0=v0)
-            if args.save_file:
+                # W,err,cost[0,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,x0=x0,v0=v0)
+            if args.save_file and False:
                 if post_collisional:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','w') as file:
                         np.savetxt(file,(W,err))
@@ -729,9 +738,9 @@ if __name__ == '__main__':
                 err = data[3]
             else:
                 start = time.time()
-                W,err,cost[1,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,x0=x0,v0=v0)
+                # W,err,cost[1,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,x0=x0,v0=v0)
                 print(f'APS with reverse one-step method is done. Time: {time.time()-start}')
-            if args.save_file:
+            if args.save_file and False:
                 if post_collisional:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','a') as file:
                         np.savetxt(file,(W,err))
