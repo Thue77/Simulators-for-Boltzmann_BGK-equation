@@ -732,7 +732,7 @@ if __name__ == '__main__':
                 else:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','w') as file:
                         np.savetxt(file,(W,err))
-            plt.errorbar(dt_list,W,err,label='APS')
+            # plt.errorbar(dt_list,W,err,label='APS')
             if uf:
                 W = data[2]
                 err = data[3]
@@ -747,7 +747,7 @@ if __name__ == '__main__':
                 else:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
                         np.savetxt(file,(W,err))
-            plt.errorbar(dt_list,W,err,label='RAPS')
+            # plt.errorbar(dt_list,W,err,label='RAPS')
             if uf:
                 W = data[4]
                 err = data[5]
