@@ -33,14 +33,17 @@ def __psi_d(xp,t,v_next,theta,z,mu,sigma,R,dR=None,boundary=None):
     # dt = np.ones(n)*dt
     # theta = dt - np.mod(tau,dt)
     if dR is None:
-        dR_zero = False
+        dR_zero = True
     else:
         dR_zero = np.min(dR(xp))==0 and np.max(dR(xp))==0
     x_pp = xp if dR_zero else xp + mu(xp)*theta/2 #Intermediate point to deal with heterogenity
     if boundary is not None: x_pp = boundary(x_pp)
     v = v_next.copy() #Velocity of kinetic phase in next step. Drawn at the position of the collision
     e = np.exp(-R(x_pp)*theta)
-    dDdR_dRdx = np.zeros(n) if dR_zero else dDdR(x_pp,v,e,theta,mu,sigma,R)*dR(x_pp)
+    if dR_zero or dR is None:
+        dDdR_dRdx = np.zeros(n)
+    else:
+        dDdR_dRdx = dDdR(x_pp,v,e,theta,mu,sigma,R)*dR(x_pp)
     A = mu(x_pp) + (v-mu(x_pp))*1/(theta*R(x_pp))*(1-e) + dDdR_dRdx #Equation 31
     D = __D(x_pp,v,e,theta,mu,sigma,R)
     D = np.maximum(D,0) #To avoid numerical errors
