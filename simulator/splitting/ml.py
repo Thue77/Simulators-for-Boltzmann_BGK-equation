@@ -19,7 +19,8 @@ def select_levels(t0,T,M_t,eps,r,F,strategy=1,cold_start=True,N=100,boundary=Non
     initial number of paths
     '''
     if strategy==1:
-        dt_0 = np.minimum((eps)**2/r(np.array([0])),T-t0)
+        # dt_0 = np.minimum((eps)**2/r(np.array([0])),T-t0)
+        dt_0 = 1/2**8
         levels = dt_0/M_t**np.arange(0,4)#np.array([dt_0,dt_0/M_t])
         N_out=np.zeros(4,dtype=np.int64)
         N_diff=np.ones(4,dtype=np.int64)*N
@@ -311,7 +312,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         pd.set_option('max_columns',None)
         for e2 in E2:
             print(f'MSE= {e2}')
-            E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=alpha,rev=rev,diff=diff)
+            E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=1,rev=rev,diff=diff)
             data[e2] = {'dt':levels,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
             df = pd.DataFrame(data[e2])
             df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in data[e2]['E']])],'V_l':' ','V[E]':[np.sum([v for v in data[e2]['V[E]']])],'C_l':[np.sum([c for c in data[e2]['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(data[e2]['N_l'],data[e2]['C_l']))]}))
@@ -334,7 +335,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         logfile.write('\n')
         logfile.close()
 
-    if convergence and False:
+    if convergence:
         plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
         plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
         plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
