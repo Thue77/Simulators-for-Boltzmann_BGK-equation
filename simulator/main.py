@@ -912,7 +912,7 @@ if __name__ == '__main__':
         epsilon= [1,0.32,0.1,0.032,0.01,0.005]
         a = 0, b = 1
         '''
-        T = 1;t0=0;dt_list=T/2**np.arange(0,1);M_t=2;
+        T = 1;t0=0;dt_list=T/2**np.arange(0,7);M_t=2;
         if uf:
             eps = np.array([1,0.32,0.1,0.032,0.01,0.005])
             step=int(input(f'Give index of step size to plot for: {dt_list}\n')) #between 0 and 6
