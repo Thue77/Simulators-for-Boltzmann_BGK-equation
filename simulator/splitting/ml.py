@@ -138,7 +138,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
         if test:
             break
         L += 1;
-        if L==18:
+        if L==17:
             print('WARNING: maximum capacity reached!')
             break
         print('Level added')
