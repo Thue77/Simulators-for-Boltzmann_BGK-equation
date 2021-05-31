@@ -6,12 +6,13 @@ import pandas as pd
 import scipy.stats as st
 from numba import njit
 
-'''Script to generate samples from rho(x,0) via the accept-reject method'''
+'''Script to generate samples from f(x,v,0) via the accept-reject method'''
 
 '''-----------First example--------------'''
 @njit(nogil=True)
 def test1(N=10_000):
     '''
+    Draw positions from rho(x,t) = 1+np.cos(2*np.pi*(x+0.5))
     N: number of samples
     '''
     #Distribution of interest in [0,1]
