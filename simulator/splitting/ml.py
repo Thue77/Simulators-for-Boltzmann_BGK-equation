@@ -20,11 +20,11 @@ def select_levels(t0,T,M_t,eps,r,F,strategy=1,cold_start=True,N=100,boundary=Non
     '''
     if strategy==1:
         # dt_0 = np.minimum((eps)**2/r(np.array([0])),T-t0)
-        dt_0 = 1/2**8
-        levels = dt_0/M_t**np.arange(0,4)#np.array([dt_0,dt_0/M_t])
-        N_out=np.zeros(4,dtype=np.int64)
-        N_diff=np.ones(4,dtype=np.int64)*N
-        SS_out = np.zeros(4);C_out = np.zeros(4); E_out=np.zeros(4)
+        dt_0 = 1/2**4
+        levels = dt_0/M_t**np.arange(0,2)#np.array([dt_0,dt_0/M_t])
+        N_out=np.zeros(2,dtype=np.int64)
+        N_diff=np.ones(2,dtype=np.int64)*N
+        SS_out = np.zeros(2);C_out = np.zeros(2); E_out=np.zeros(2)
     else:
         dt_1 = np.minimum(eps**2/r(np.array([0])),T-t0)
         levels = np.append(np.array([T-t0]),dt_1/M_t**np.arange(0,3))
@@ -39,9 +39,9 @@ def rnd1(x, decimals, out):
     return np.round_(x, decimals, out).astype(np.int64)
 
 @njit(nogil=True,parallel=True)
-def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1,rev=False,diff=False,v_ms=1,std=False):
+def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1,rev=False,diff=False,v_ms=1,std=False,update=True):
     # levels = ll.copy()
-    cores = 8
+    cores = 1 if np.sum(N)==0 else 8
     n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff)).astype(np.int64))
     for j in range(len(I)):
         i=I[j]
@@ -81,9 +81,10 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
                 SS_temp = np.sum((est-E_temp)**2)
             Delta = delta(E[i],E_temp,N[i],n[i])
             E[i] = x_hat(N[i],n[i],E[i],E_temp,Delta)
-            SS[i] = Sfunc(N[i],n[i],SS[i],SS_temp,Delta)
-            '''Update cost like updating an average'''
-            C[i] = x_hat(N[i],n[i],C[i],C_temp,delta(C[i],C_temp,N[i],n[i]))
+            if update:
+                SS[i] = Sfunc(N[i],n[i],SS[i],SS_temp,Delta)
+                '''Update cost like updating an average'''
+                C[i] = x_hat(N[i],n[i],C[i],C_temp,delta(C[i],C_temp,N[i],n[i]))
             N[i] = N[i] + n[i]
     return E,SS,N,C
 
@@ -110,17 +111,18 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
     SS: sum of squares at each level
     C: Cost at each level
     '''
-    L = len(levels)
+    L = len(levels)-1
     # C = M_t**np.arange(0,L,1); C[1:] = C[1:] + M_t**np.arange(0,L-1,1)
     '''While loop to continue until RMSE fits with e2'''
     while True:
         '''Update paths based on N_diff'''
         while np.max(N_diff)>0:
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
-            N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*8_000_000)
+            N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*400_000)
             # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
-            E,SS,N,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy,rev=rev,diff=diff,v_ms=v_ms,std=std)
-            V = SS/(N-1) #Update variance
+            first = np.sum(N)==0
+            E,SS,N,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy,rev=rev,diff=diff,v_ms=v_ms,std=std,update=first)
+            if first: V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
             N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
         '''Test bias is below e2/2 - to do so it is necessary to know exponent
@@ -128,11 +130,9 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
         # test = max(abs(0.5*E[L-2]),abs(E[L-1])) < np.sqrt(e2/2)
         if E.size>=4:
             if alpha is None:
-                L1 = max(1,np.where(levels<=eps**2)[0][0])
+                L1 = max(1,np.where(levels<=eps**2/r(1))[0][0])
                 pa = lin_fit(np.arange(L1,L),np.log2(np.abs(E[L1:L]))); alpha = -pa[0]
             test = np.max(np.abs(E[-3:]))/(M_t**alpha-1) < np.sqrt(e2/2)
-            # print('Extrapolated values for bias:')
-            # print(np.abs(E[-3:])/M_t**(np.flip(np.arange(0,3))*alpha))
         else:
             test=False
         if test:
@@ -142,16 +142,24 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
             print('WARNING: maximum capacity reached!')
             break
         print('Level added')
-        print(L)
         # print(f'New level: {L}')
-        N_diff = np.append(N_diff,N_warm).astype(np.int64)
-        N = np.append(N,0).astype(np.int64)
-        E = np.append(E,0.0); V = np.append(V,0.0); SS = np.append(SS,0.0)
-        C = np.append(C,0.0);#np.append(C,M_t**(L-1)+M_t**(L-2)); #
-        if strategy==1:
-            levels = np.append(levels,levels[0]/(M_t**(L-1)))
+        if beta is None and gamma is None:
+            N_diff = np.append(N_diff,N_warm).astype(np.int64)
+            N = np.append(N,0).astype(np.int64)
+            E = np.append(E,0.0); V = np.append(V,0.0); C = np.append(C,0.0); SS = np.append(SS,0.0)
         else:
-            levels = np.append(levels,levels[1]/(M_t**(L-2)))
+            #Calculate constant from Theorem
+            c2 = V[-1]*2**((L-1)*beta)
+            V = np.append(V,c2*2**(-L*beta))
+            c3 = C[-1]*2**(-(L-1)*gamma)
+            C = np.append(C,c3*2**(L*gamma))
+            E = np.append(E,0.0);
+            N = np.append(N,0).astype(np.int64)
+            N_diff = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N
+        if strategy==1:
+            levels = np.append(levels,levels[0]/(M_t**(L)))
+        else:
+            levels = np.append(levels,levels[1]/(M_t**(L)))
     return E,V,C,N,levels
 
 
@@ -310,9 +318,31 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
             logfile.write("---------------------------------------------------------\n")
         data = {}
         pd.set_option('max_columns',None)
-        for e2 in E2:
+        # for e2 in E2:
+        #     print(f'MSE= {e2}')
+        #     E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=1,rev=rev,diff=diff)
+        #     data[e2] = {'dt':levels,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
+        #     df = pd.DataFrame(data[e2])
+        #     df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in data[e2]['E']])],'V_l':' ','V[E]':[np.sum([v for v in data[e2]['V[E]']])],'C_l':[np.sum([c for c in data[e2]['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(data[e2]['N_l'],data[e2]['C_l']))]}))
+        #     print(df)
+        #     if save_file:
+        #         name = f'resultfile_complexity_{e2}'+logfile.name[7:]
+        #         df.to_csv(name,index=False)
+        #         logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {levels} \n")
+
+        # Projected cost based on Multilevel Theorem
+        cost_e=0; l = 12
+        e2 = 1/2**l
+        # Wall clock time
+        WC = []
+        print('Compile')
+        ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=1.0,beta=1.0,gamma=1.0,rev=rev,diff=diff)
+        print('Compilation done')
+        while cost_e<6000:
             print(f'MSE= {e2}')
-            E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=1,rev=rev,diff=diff)
+            start = time.perf_counter()
+            E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=1.0,beta=1.0,gamma=1.0,rev=rev,diff=diff)
+            WC += [time.perf_counter()-start]
             data[e2] = {'dt':levels,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
             df = pd.DataFrame(data[e2])
             df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in data[e2]['E']])],'V_l':' ','V[E]':[np.sum([v for v in data[e2]['V[E]']])],'C_l':[np.sum([c for c in data[e2]['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(data[e2]['N_l'],data[e2]['C_l']))]}))
@@ -321,16 +351,21 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
                 name = f'resultfile_complexity_{e2}'+logfile.name[7:]
                 df.to_csv(name,index=False)
                 logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {levels} \n")
+            #Actual simulation cost
+            cost_s = np.dot(C,N)
+            #Constant from Theorem
+            c4 = c4 = cost_s*e2/(np.log(np.sqrt(e2))**2)
+            l+=1
+            e2 = 1/2**l
+            cost_e = c4*np.log(np.sqrt(e2))**2/e2
+            if l==24:
+                break
 
-        # for e2,d in data.items():
-        #     print(f'MSE: {e2}')
-        #     df = pd.DataFrame(d)
-        #     df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in d['E']])],'V_l':' ','V[E]':[np.sum([v for v in d['V[E]']])],'C_l':[np.sum([c for c in d['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(d['N_l'],d['C_l']))]}))
-        #     # df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':' ','V_l':' ','C_l':' ','N_l C_l':' '}))
-        #     print(df)
-        #     if save_file:
-        #         name = f'resultfile_complexity_{e2}'+logfile.name[7:]
-        #         df.to_csv(name,index=False)
+        if save_file:
+            name = f'wall_clock_time_{e2}'+logfile.name[7:]
+            np.savetxt(name,WC)
+
+
     if save_file:
         logfile.write('\n')
         logfile.close()
