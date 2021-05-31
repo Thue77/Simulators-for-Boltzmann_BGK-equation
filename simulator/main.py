@@ -18,7 +18,11 @@ from splitting.mc import mc_density_test as APSMC_density_test
 from kinetic_diffusion.mc import mc_density_test as KDMC_density_test
 from kinetic_diffusion.mc import mc2_par as KMC_par
 from kinetic_diffusion.mc import mc1_par as KDMC_par
+from kinetic_diffusion.mc import KDMC
+from splitting.mc import mc as APSMC
 from splitting.mc import mc2_par as SMC_par
+from kinetic_diffusion.mc import Kinetic as KMC
+from splitting.mc import mc as SMC
 from splitting.mc import mc1_par as APSMC_par
 from splitting.correlated import correlated_test,correlated,correlated_ts
 from kinetic_diffusion.correlated import correlated as KDCOR
@@ -32,8 +36,10 @@ parser.add_argument('epsilon', help="value for mean free path",type=float)
 parser.add_argument('a', help="parameter in collision rate. Its function depends of the example",type=float)
 parser.add_argument('b', help="parameter in collision rate. Its function depends of the example",type=float)
 parser.add_argument('-de','--density_est',action='store_true',help='Compares density estimation error. For final example in Thesis')
-parser.add_argument('--ml_test_KD',action='store_true',help='Runs Kinetic-Diffusion version of ml_test for final example in Thesis')
-parser.add_argument('--ml_test_APS',action='store_true',help='Runs asymptotic preserving splitting(APS) version of ml_test for final example in Thesis')
+parser.add_argument('--ml_test_KD',action='store_true',help='Runs Kinetic-Diffusion version of ml_test for final example in Thesis. Remember to give type of test by specifying --type')
+parser.add_argument('--ml_test_APS',action='store_true',help='Runs asymptotic preserving splitting(APS) version of ml_test for final example in Thesis. Remember to give type of test by specifying --type')
+parser.add_argument('--ml_cost',action='store_true',help='Plots cost of all ML-methods based on the data in the given folder. Remember to give type of test by specifying --type')
+parser.add_argument('--type',help='Type of test to run for the ml_test_KD and ml_test_KD. Choose a convergence test, a complexity test or by giving the resepctive arguments "conv", "comp" or "both".')
 parser.add_argument('-rt','--radiative_transport',action='store_true',help='Radiative tranport example for MC-methods')
 parser.add_argument('-ct','--correlation_test',action='store_true',help='Plot to compare fine and coarse path for new correlation. Homogenous background is used.')
 parser.add_argument('-gt','--goldstein_taylor',action='store_true',help='Runs ml_test for APS with Goldstein-Taylor distribution as post-collisional distribution and r(x)=1')
@@ -60,7 +66,7 @@ b = args.b
 N = args.paths
 
 
-density_est = args.density_est; ml_test_KD = args.ml_test_KD; ml_test_APS = args.ml_test_APS
+density_est = args.density_est; ml_test_KD = args.ml_test_KD; ml_test_APS = args.ml_test_APS; ml_cost = args.ml_cost; type = args.type
 radiative_transport = args.radiative_transport; goldstein_taylor = args.goldstein_taylor
 level_selection = args.level_selection; correlation_test = args.correlation_test; correlated_time_test = args.correlated_time_test
 uf = args.use_file
@@ -70,7 +76,7 @@ diffusion_limit = args.diffusion_limit
 one_step_dist = args.one_step_dist
 
 
-if not args.one_step_dist and not args.diffusion_limit and not args.correlated_time_test and not args.correlation_test and not args.density_est and not args.ml_test_KD and not args.ml_test_APS and not args.goldstein_taylor and not args.radiative_transport and not args.level_selection:
+if not args.ml_cost and not args.one_step_dist and not args.diffusion_limit and not args.correlated_time_test and not args.correlation_test and not args.density_est and not args.ml_test_KD and not args.ml_test_APS and not args.goldstein_taylor and not args.radiative_transport and not args.level_selection:
     sys.exit('ERROR: no valid example given. Run "main.py -h" for more info')
 
 if std and not rev:
@@ -123,6 +129,7 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         x,v,v_norm = test2(N)
         v = v/epsilon
+        # x=np.ones(N)*3
     return x,v,v_norm
 
 def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
@@ -142,6 +149,7 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         x,v,v_norm = test2(N)
         v=v_norm.copy()
+        # x=np.ones(N)*3
     elif correlation_test or correlated_time_test:
         x = np.ones(N); v = np.random.normal(0,1,size=N)
         v_norm = v.copy()
@@ -489,78 +497,148 @@ if __name__ == '__main__':
         except FileNotFoundError:
             print('Maybe the separator is wrong. Give the separator that fits with your operating system. It is done by adding the argument -sep "your_separator"')
             raise
+    if ml_cost:
+        E2=1/2**np.arange(13,23)
+        start = 0
+        cost = []
+        for e2 in E2[start:]:
+            df = pd.read_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            L = len(df.get('N_l C_l'))-1
+            cost += [df.get('N_l C_l')[L]]
+        c4 = np.mean(cost*E2[start:]/np.log(np.sqrt(E2[start:])))
+        c4 += 2*c4
+        plt.plot(E2[start:],c4*np.log(np.sqrt(E2[start:])),label= r'$\mathcal{O}(\log(\sqrt{E})^2)$')
+        plt.plot(E2[start:],cost*E2[start:],label=r'APS')
+
+        cost = []
+        for e2 in E2[start:]:
+            df = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_True_diff_True_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            L = len(df.get('N_l C_l'))-1
+            cost += [df.get('N_l C_l')[L]]
+        plt.plot(E2[start:],cost*E2[start:],label=r'RAPSD w. weighted correlation')
+        cost = []
+        for e2 in E2[start:]:
+            df = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_True_diff_True_std_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            L = len(df.get('N_l C_l'))-1
+            cost += [df.get('N_l C_l')[L]]
+        plt.plot(E2[start:],cost*E2[start:],label=r'RAPSD w. standard correlation')
+
+        cost = []
+        for e2 in E2[start:]:
+            df = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_False_diff_True_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            L = len(df.get('N_l C_l'))-1
+            cost += [df.get('N_l C_l')[L]]
+        plt.plot(E2[start:],cost*E2[start:],label=r'APSD')
+
+        cost = []
+        for e2 in E2[start:]:
+            df = pd.read_csv(f'resultfile_complexity_{e2}_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            # print(dfs[e2])
+            L = len(df.get('N_l C_l'))-1
+            cost += [df.get('N_l C_l')[L]]
+        # CE2 = cost*E2
+        c4 = np.mean(cost*E2[start:])
+        c4 *= 2
+        plt.plot(E2[start:],c4*np.ones(E2[start:].size),label= r'$\mathcal{O}(1)$')
+        plt.plot(E2[start:],cost*E2[start:],label=r'KD')
+
+        plt.yscale('log')
+        plt.xscale('log')
+        plt.xlabel(r'$E^2$')
+        plt.ylabel(r'$Cost*E^2$')
+        plt.legend()
+        plt.show()
     if ml_test_APS:
-        E2=0.01/2**np.arange(0,16)
+        E2=1/2**np.arange(0,16)
+        # type = str(input('For complexity results write "comp" and for convergence results write "conv". For both write "both"\n'))
         if uf:
-            if not rev and not diff:
-                (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            else:
-                if std:
-                    (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_std_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            if type == 'conv' or type == 'both':
+                if not rev and not diff:
+                    (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
                 else:
-                    (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
+                    if std:
+                        (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_std_for_a={a}_b={b}_epsilon={epsilon}.txt')
+                    else:
+                        (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
 
-            '''Find index where they transition'''
-            i = 1
-            old = 0
-            for va in var2[1:]:
-                if va < old:
-                    break
-                i+=1
-                old=va
-            print(f'dt: {dt_list[i]}, index: {i}')
-            print(f'var: {var2}')
-            print(f'bias: {bias}')
-            print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
-            print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
-            print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
-            print(f'slope of bias after:{np.polyfit(range(i,bias.size),np.log2(np.abs(bias[i:])),1)}')
-            print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
+                '''Find index where they transition'''
+                i = 1
+                old = 0
+                for va in var2[1:]:
+                    if va < old:
+                        break
+                    i+=1
+                    old=va
+                print(f'dt: {dt_list[i]}, index: {i}')
+                print(f'var: {var2}')
+                print(f'bias: {bias}')
+                # print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
+                print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
+                # print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
+                print(f'slope of bias after:{np.polyfit(range(i,bias.size),np.log2(np.abs(bias[i:])),1)}')
+                print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
 
-            fig,ax = plt.subplots()
-            ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
-            ax.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
-            ax.plot(dt_list[1:],np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
-            ax.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
-            ax.set_title(f'Plot of variance and bias')
-            ax.set_xscale('log')
-            ax.set_yscale('log')
-            ax.set_xlim(max(dt_list),min(dt_list))
-            ax.set_xlabel(r'$\Delta t$')
-            plt.legend()
-            fig2,ax2 = plt.subplots()
-            ax2.plot(dt_list[1:],cost2[1:],':')
-            ax2.set_xscale('log')
-            ax2.set_yscale('log')
-            ax2.set_xlim(max(dt_list),min(dt_list))
-            ax2.set_xlabel(r'$\Delta t$')
-            ax2.set_ylabel(r'Wall clock time per path')
-            # plt.legend()
-            # plt.savefig(f'var_APS_diff_{diff}_rev_{rev}_std_{std}_eps_{epsilon}_a_{a}_b_{b}.png')
-            plt.figure()
-            plt.plot(range(1,dt_list.size),kur1[1:],':')
-            plt.xlabel('Levels')
-            plt.ylabel(r'$\frac{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^4]}{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^2]^2}$')
-            plt.title(f'Plot of kurtosis')
-            plt.figure()
-            plt.plot(range(1,dt_list.size),cons[1:],':')
-            plt.title(f'Plot check of consistency')
-            plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
-            plt.xlabel('Levels')
-            plt.show()
-
-            # dfs = {}
-            # for e2 in E2:
-            #     if not rev and not diff:
-            #         dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            #     else:
-            #         dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            #     print(dfs[e2])
+                fig,ax = plt.subplots()
+                ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
+                ax.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
+                ax.plot(dt_list[1:],np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
+                ax.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
+                ax.set_title(f'Plot of variance and bias')
+                ax.set_xscale('log')
+                ax.set_yscale('log')
+                ax.set_xlim(max(dt_list),min(dt_list))
+                ax.set_xlabel(r'$\Delta t$')
+                plt.legend()
+                fig2,ax2 = plt.subplots()
+                ax2.plot(dt_list[1:],cost2[1:],':')
+                ax2.set_xscale('log')
+                ax2.set_yscale('log')
+                ax2.set_xlim(max(dt_list),min(dt_list))
+                ax2.set_xlabel(r'$\Delta t$')
+                ax2.set_ylabel(r'Wall clock time per path')
+                # plt.legend()
+                # plt.savefig(f'var_APS_diff_{diff}_rev_{rev}_std_{std}_eps_{epsilon}_a_{a}_b_{b}.png')
+                plt.figure()
+                plt.plot(range(1,dt_list.size),kur1[1:],':')
+                plt.xlabel('Levels')
+                plt.ylabel(r'$\frac{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^4]}{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^2]^2}$')
+                plt.title(f'Plot of kurtosis')
+                plt.figure()
+                plt.plot(range(1,dt_list.size),cons[1:],':')
+                plt.title(f'Plot check of consistency')
+                plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
+                plt.xlabel('Levels')
+                plt.show()
+            if type == 'comp' or type == 'both':
+                dfs = {}
+                cost = []
+                start = 5
+                for e2 in E2[start:]:
+                    if not rev and not diff:
+                        dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
+                    else:
+                        if std:
+                            dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_{rev}_diff_{diff}_std_for_a={a}_b={b}_epsilon={epsilon}.txt')
+                        else:
+                            dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
+                    print(dfs[e2])
+                    L = len(dfs[e2].get('N_l C_l'))-1
+                    cost += [dfs[e2].get('N_l C_l')[L]]
+                c4 = np.mean(cost*E2[start:]/np.log(np.sqrt(E2[start:])))
+                c4 += 4*c4
+                plt.plot(E2[start:],c4*np.log(np.sqrt(E2[start:]))/E2[start:],label= r'$\mathcal{O}(\frac{\log(\sqrt{E})^2}{E^{2}})$')
+                plt.plot(E2[start:],cost,label=r'Total cost')
+                plt.yscale('log')
+                plt.xscale('log')
+                plt.legend()
+                plt.show()
+            else:
+                sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
 
         else:
             if N is None:
                 N = 120_000
-            N0=16; T=1; dt_list = T/2**np.arange(0,17,1); t0=0; M_t=2
+            N0=2000; T=1; dt_list = T/2**np.arange(0,17,1); t0=0; M_t=2
             if args.save_file:
                 '''file names:
                 "logfile_APS_for_a={a}_b={b}_epsilon={epsilon}.txt"
@@ -577,93 +655,129 @@ if __name__ == '__main__':
             else:
                 logfile=None
             # start = time.perf_counter()
-            APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,convergence=False,rev=rev,diff=diff,v_ms=v_ms,std=std)
-            # print(f'time: {time.perf_counter()-start}')
+            # x = SMC(dt,t0,T,N,eps,Q,M,r,rev=rev,diff=diff,v_ms=1)
+            if type=='comp':
+                APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,convergence=False,rev=rev,diff=diff,v_ms=v_ms,std=std)
+            elif type=='conv':
+                APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False,convergence=True,rev=rev,diff=diff,v_ms=v_ms,std=std)
+            elif type=='both':
+                APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,convergence=True,rev=rev,diff=diff,v_ms=v_ms,std=std)
+            else:
+                sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
     if ml_test_KD:
-        E2=0.01/2**np.arange(0,16)
+        E2=1/2**np.arange(13,24)
+        # type = str(input('For complexity results write "comp" and for convergence results write "conv". For both write "both"\n'))
         if uf:
-            (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            if type == 'conv' or type == 'both':
+                (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
 
-            '''Find index where they transition'''
-            i = 1
-            old = 0
-            for va in var2[1:]:
-                if va < old:
-                    break
-                i+=1
-                old=va
-            print(f'dt: {dt_list[i]}, index: {i}')
-            print(f'var: {var2}')
-            print(f'bias: {bias}')
-            print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
-            print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
-            print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
-            print(f'slope of bias after:{np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)}')
-            print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
+                '''Find index where they transition'''
+                i = 1
+                old = 0
+                for va in var2[1:]:
+                    if va < old:
+                        break
+                    i+=1
+                    old=va
+                print(f'dt: {dt_list[i]}, index: {i}')
+                print(f'var: {var2}')
+                print(f'bias: {bias}')
+                print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
+                print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
+                print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
+                print(f'slope of bias after:{np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)}')
+                print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
 
-            fig,ax = plt.subplots()
-            ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
-            ax.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
-            ax.plot(dt_list[1:],np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
-            ax.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
-            ax.set_title(f'Plot of variance and bias')
-            ax.set_xscale('log')
-            ax.set_yscale('log')
-            ax.set_xlim(max(dt_list),min(dt_list))
-            ax.set_xlabel(r'$\Delta t$')
-            plt.legend()
-            fig2,ax2 = plt.subplots()
-            ax2.plot(dt_list[1:],cost2[1:],':')
-            ax2.set_xscale('log')
-            ax2.set_yscale('log')
-            ax2.set_xlim(max(dt_list),min(dt_list))
-            ax2.set_xlabel(r'$\Delta t$')
-            plt.legend()
-            # plt.savefig(f'var_KD_eps_{epsilon}_a_{a}_b_{b}.png')
-            plt.figure()
-            plt.plot(range(1,dt_list.size),kur1[1:],':')
-            plt.xlabel('Levels')
-            plt.ylabel(r'$\frac{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^4]}{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^2]^2}$')
-            plt.title(f'Plot of kurtosis')
-            plt.figure()
-            plt.plot(range(1,dt_list.size),cons[1:],':')
-            plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
-            plt.xlabel('Levels')
-            plt.title(f'Plot check of consistency')
-            plt.show()
-            # dfs = {}
-            # for e2 in E2:
-            #     dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            #     print(dfs[e2])
+                fig,ax = plt.subplots()
+                ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
+                ax.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
+                ax.plot(dt_list[1:],np.abs(bias[1:]),':',label='|mean(F(X^f)-F(X^c))|')
+                ax.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
+                ax.set_title(f'Plot of variance and bias')
+                ax.set_xscale('log')
+                ax.set_yscale('log')
+                ax.set_xlim(max(dt_list),min(dt_list))
+                ax.set_xlabel(r'$\Delta t$')
+                plt.legend()
+                fig2,ax2 = plt.subplots()
+                ax2.plot(dt_list[1:],cost2[1:],':')
+                ax2.set_xscale('log')
+                ax2.set_yscale('log')
+                ax2.set_xlim(max(dt_list),min(dt_list))
+                ax2.set_xlabel(r'$\Delta t$')
+                plt.legend()
+                # plt.savefig(f'var_KD_eps_{epsilon}_a_{a}_b_{b}.png')
+                plt.figure()
+                plt.plot(range(1,dt_list.size),kur1[1:],':')
+                plt.xlabel('Levels')
+                plt.ylabel(r'$\frac{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^4]}{E[(F(Y^{\Delta t_l})-F(Y^{\Delta t_{l-1}}))^2]^2}$')
+                plt.title(f'Plot of kurtosis')
+                plt.figure()
+                plt.plot(range(1,dt_list.size),cons[1:],':')
+                plt.ylabel(r'$\frac{|a-b+c|}{3(\sqrt{V[a]}+\sqrt{V[b]}+\sqrt{V[c]})}$')
+                plt.xlabel('Levels')
+                plt.title(f'Plot check of consistency')
+                plt.show()
+            if type == 'comp' or type == 'both':
+                dfs = {}
+                cost = []
+                start=1
+                for e2 in E2[start:]:
+                    dfs[e2] = pd.read_csv(f'resultfile_complexity_{e2}_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
+                    # print(dfs[e2])
+                    L = len(dfs[e2].get('N_l C_l'))-1
+                    cost += [dfs[e2].get('N_l C_l')[L]]
+                # CE2 = cost*E2
+                c4 = np.mean(cost*E2[start:])
+                c4 *= 3
+                plt.plot(E2[start:],c4/E2[start:],label= r'$\mathcal{O}(E^{-2})$')
+                plt.plot(E2[start:],cost,label=r'Total cost')
+                plt.yscale('log')
+                plt.xscale('log')
+                plt.legend()
+                plt.show()
+            else:
+                sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
 
         else:
             if N is None:
                 N = 120_000
-            N0=16; T=1; dt_list = T/2**np.arange(0,17,1); t0=0
+            N0=2000; T=1; dt_list = T/2**np.arange(0,17,1); t0=0
             if args.save_file:
                 logfile = open(f'logfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=True,convergence=False)
-            # start1 = time.perf_counter()
-            # dt_list = np.array([1/2**6,1/2**7])
-            # KD_conv(8,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary)
-            # end1 = time.perf_counter()
-            # print((end1-start1)/2)
-            # # start1 = time.perf_counter()
-            # b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = KD_conv(N,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary)
-            # # end1 = time.perf_counter()
-            # print(cost2)
+            # # x1 = KDMC(1/2**12,N,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
+            # x1 = KMC(N,Q,t0,T,mu,sigma,M,R,SC)
+            # print(np.mean(x1**2))
+            # x2 = SMC(1/2**12,t0,T,N,epsilon,Q_nu,M_nu,r,rev=rev,diff=diff,v_ms=1)
+            # # x2 = APSMC(1/2**12,t0,T,N,epsilon,Q_nu,M_nu,r,boundary=boundary,rev=rev,diff=diff,v_ms=v_ms)
+            # print(np.mean(x2**2))
+            # print(f'wasserstein_distance: {wasserstein_distance(x1,x2)}')
+            # dist = pd.DataFrame(data={'x':x1,'Method':['KMC' for _ in range(N)]})
+            # # sns.kdeplot(data=dist, x="x",label='KMC')
+            # dist = dist.append(pd.DataFrame(data={'x':x2, 'Method':['SMC' for _ in range(N)]}))
+            # sns.kdeplot(data=dist, x="x",hue='Method',common_norm=False)
+            # plt.show()
+            if type=='comp':
+                KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,complexity=True,convergence=False)
+            elif type=='conv':
+                KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,complexity=False,convergence=True)
+            elif type=='both':
+                KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,complexity=True,convergence=True)
+            else:
+                sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
+
     if goldstein_taylor:
         if N is None:
             N=120_000;
-        N0=40; M_t = 2; t0=0;T=5
+        N0=40; M_t = 2; t0=0;T=0.5
         dt_list = T/2**np.arange(0,17,1); E2=np.array([0.01,0.0001,1e-6],dtype=np.float64)
         if args.save_file:
             logfile = open(f'logfile_APS_Goldstein_Taylor_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
         else:
             logfile=None
-        APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False)
+        APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,convergence=False)
         # x_std = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
         # W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std)
         # plt.errorbar(dt_list,W,err,label='Error APS GT dist')
@@ -706,7 +820,7 @@ if __name__ == '__main__':
                 else:
                     # x_std = np.loadtxt(f'density_exact_KD_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
                     data = np.loadtxt(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt')
-                    cost = np.loadtxt(f'density_resultfile_cost_for_a={a}_b={b}_epsilon={epsilon}_post.txt')
+                    cost = np.loadtxt(f'density_resultfile_cost_for_a={a}_b={b}_epsilon={epsilon}.txt')
             else:
                 print(f'{N} paths used for simulation')
                 x0,v0,_ = Q_nu(N)
@@ -723,31 +837,31 @@ if __name__ == '__main__':
                 err = data[1]
             else:
                 print('Done with exact')
-                # print(f'{N/10} paths used to estimate density with APSMC and KDMC')
-                # W,err,cost[0,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,x0=x0,v0=v0)
-            if args.save_file and False:
+                # print(f'{N} paths used to estimate density with APSMC and KDMC')
+                W,err,cost[0,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,v_ms=v_ms,x0=x0,v0=v0)
+            if args.save_file:
                 if post_collisional:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','w') as file:
                         np.savetxt(file,(W,err))
                 else:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','w') as file:
                         np.savetxt(file,(W,err))
-            # plt.errorbar(dt_list,W,err,label='APS')
+            plt.errorbar(dt_list,W,err,label='APS')
             if uf:
                 W = data[2]
                 err = data[3]
             else:
                 start = time.time()
-                # W,err,cost[1,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,x0=x0,v0=v0)
+                W,err,cost[1,:]=APSMC_density_test(dt_list,M_t,t0,T,N,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std,rev=True,x0=x0,v0=v0)
                 print(f'APS with reverse one-step method is done. Time: {time.time()-start}')
-            if args.save_file and False:
+            if args.save_file:
                 if post_collisional:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}_post.txt','a') as file:
                         np.savetxt(file,(W,err))
                 else:
                     with open(f'density_resultfile_for_a={a}_b={b}_epsilon={epsilon}.txt','a') as file:
                         np.savetxt(file,(W,err))
-            # plt.errorbar(dt_list,W,err,label='RAPS')
+            plt.errorbar(dt_list,W,err,label='RAPS')
             if uf:
                 W = data[4]
                 err = data[5]
@@ -810,8 +924,6 @@ if __name__ == '__main__':
             plt.ylabel('Wall clock time')
             plt.legend()
             plt.show()
-
-
     if radiative_transport:
         '''Numerical experiemnt on radiative transport with
         rho(x,0) = 1+cos(2*pi*(x+0.5)) and V ~ U(-1,1)'''
@@ -923,7 +1035,7 @@ if __name__ == '__main__':
         '''
         T = 1;t0=0;dt_list=T/2**np.arange(0,7);M_t=2;
         if uf:
-            eps = np.array([1,0.32,0.1,0.032,0.01,0.005])
+            eps = np.array([1,0.32,0.1,0.032])#,0.01,0.005])
             step=int(input(f'Give index of step size to plot for: {dt_list}\n')) #between 0 and 6
             if args.folder == 'nu_standard' and not post_collisional:
                 data = np.loadtxt(f'density_resultfile_a_{a}_b_{b}_all_eps_and_dt.txt')
@@ -1018,9 +1130,9 @@ if __name__ == '__main__':
                     with open(f'density_resultfile_diffusion_limit_a_{a}_b_{b}_eps_{epsilon}_post.txt','w') as f:
                         np.savetxt(f,np.vstack((W,err)))
                 else:
-                    with open(f'density_resultfile_diffusion_KD_limit_a_{a}_b_{b}_eps_{epsilon}.txt','w') as f:
+                    with open(f'density_resultfile_diffusion_limit_a_{a}_b_{b}_eps_{epsilon}.txt','w') as f:
                         np.savetxt(f,np.vstack((W,err)))
-                    with open(f'density_resultfile_diffusion_KD_limit_a_{a}_b_{b}_eps_{epsilon}_cost.txt','w') as f:
+                    with open(f'density_resultfile_diffusion_limit_a_{a}_b_{b}_eps_{epsilon}_cost.txt','w') as f:
                         np.savetxt(f,cost)
 
 
