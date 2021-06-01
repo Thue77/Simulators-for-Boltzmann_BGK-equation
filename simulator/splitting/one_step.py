@@ -13,26 +13,26 @@ def psi_t(x,v,dt,eps,z,r,diff=False,v_ms=1):
     A = eps/(eps**2+dt*r(x))*v
     return x + A*dt + np.sqrt(2*dt*D)*z
 
-def psi_c(x,v,dt,eps,u,B,r,v_next = None):
+def psi_c(x,v,dt,eps,u,M,r,v_next = None):
     '''
     u: vector of uniform numbers in [0,1] to sample from M with appropriate probability
     '''
     p = (u>=eps**2/(eps**2+dt*r(x))) #1 if collision occurs
     if v_next is None:
-        v_next,v_bar = B(x)
+        v_next,v_bar = M(x)
 
     v = (1-p)*v + p*v_next#v_bar
-    return v,v_bar
+    return v,v_next#v_bar
 
-def phi_APS(x,v,dt,eps,z,u,B,r,v_next=None,boundary=None,diff=False,v_ms=1):
+def phi_APS(x,v,dt,eps,z,u,M,r,v_next=None,boundary=None,diff=False,v_ms=1):
     x = psi_t(x,v,dt,eps,z,r,diff=diff,v_ms=v_ms)
     if boundary is not None:
         x = boundary(x)
-    v,v_bar = psi_c(x,v,dt,eps,u,B,r,v_next)
+    v,v_bar = psi_c(x,v,dt,eps,u,M,r,v_next)
     return x,v,v_bar
 
-def phi_APS_new(x,v,dt,eps,z,u,B,r,v_next=None,boundary=None,diff=False,v_ms=1):
-    v,v_bar = psi_c(x,v,dt,eps,u,B,r,v_next)
+def phi_APS_new(x,v,dt,eps,z,u,M,r,v_next=None,boundary=None,diff=False,v_ms=1):
+    v,v_bar = psi_c(x,v,dt,eps,u,M,r,v_next)
     x = psi_t(x,v,dt,eps,z,r,diff=diff,v_ms=v_ms)
     if boundary is not None:
         x = boundary(x)
