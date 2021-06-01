@@ -466,7 +466,7 @@ v_ms = 1#epsilon**2 if density_est or ml_test_APS else 1
 
 '''Function related to the quantity of interest, E(F(X,V))'''
 def F(x,v=0):
-    if goldstein_taylor or ml_test_KD:
+    if goldstein_taylor:
         return x**2
     else:
         return x
