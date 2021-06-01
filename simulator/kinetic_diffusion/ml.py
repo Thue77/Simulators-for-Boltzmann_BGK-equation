@@ -87,7 +87,7 @@ def warm_up(L,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,N=100,tau=None):
     return Q_l,Q_l_L,V_l,V_l_L,C_l,C_l_L
 
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def select_levels(L,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,N=100,tau=None):
     '''
     V: array of variances. Length L+1
@@ -136,7 +136,7 @@ def select_levels(L,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,N=100,tau=None)
 
 
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def diff_np(a):
     '''Replacement for np.diff'''
     return a[1:]-a[:-1]
@@ -176,15 +176,15 @@ def update_path_old(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,bo
         N[i] = N[i] + N_diff[i]
     return E,SS,N,N_diff,C
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def rnd1(x, decimals, out):
-    return np.round_(x, decimals, out).astype(np.int64)
+    return np.round_(x, decimals, out)#.astype(np.int64)
 
 
 @njit(nogil=True,parallel=True)
 def update_path(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary,update = True):
     cores = 1 if update else 8
-    n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff)).astype(np.int64))
+    n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff/cores)).astype(np.int64))
     # n = np.ones(2,dtype=np.int64)*2#np.maximum(np.ones(N_diff.size)*2,np.round(N_diff/cores,0,np.empty_like(N_diff/cores))).astype(np.int64)
     # for i,Nd in enumerate(N_diff):
     #     n[i] = max(2,round(Nd/cores))
@@ -206,8 +206,6 @@ def update_path(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boun
                 E_temp = np.mean(est_f-est_c)
                 SS_temp = np.sum((est_f-est_c-E_temp)**2)
             else:
-                # e = np.random.exponential(scale=1,size=N_diff[i]) #Could maybe be implemented in KDMC
-                # tau = SC(x0,v0,e) #Could maybe be implemented in KDMC
                 with objmode(start2 = 'f8'):
                     start2 = time.perf_counter()
                 x = KDMC(dt_f,n[i],Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
@@ -224,8 +222,6 @@ def update_path(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boun
                 '''Update cost like updating an average'''
                 C[i] = x_hat(N[i],n[i],C[i],C_temp,delta(C[i],C_temp,N[i],n[i]))
             N[i] = N[i] + n[i]
-            # C[i] = x_hat(N[i],8*n[i],C[i],C2/(8*n[i]),delta(C[i],C2/(8*n[i]),N[i],8*n[i])) if i >0 else x_hat(N[i],8*n[i],C[i],C1/(8*n[i]),delta(C[i],C1/(8*n[i]),N[i],8*n[i]))
-            # N[i] = N[i] + 8*n[i]
     return E,SS,N,C
 
 def lin_fit(x,y):
@@ -260,7 +256,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,tau=None,L=14,N_warm = 10
             # print('update paths')
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*400_000)
-            update = np.sum(N)==0#(L_num==L_start and beta is not None and gamma is not None)
+            update = np.sum(N)==0 or (beta is None and gamma is None)
             E,SS,N,C = update_path(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary,update=update)
             if update:V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
@@ -277,28 +273,29 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,tau=None,L=14,N_warm = 10
                 N_diff[index_bias] += rnd1(N[index_bias]*0.1,0,np.empty_like(N[index_bias]*0.1)).astype(np.int64)
         '''Test bias is below e2/2'''
         if E.size>=4:
+            test = np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2)
             '''Find jumps in levels. For those jumps, it is not the case that dt_c=2*dt_f
             Need to account for that when extrapolating values from previous levels.
             '''
-            jumps_index = np.where(np.diff(levels)!=1)[0]+1
-            if jumps_index.size==0: jumps_index= np.array([0],dtype=np.int64)
-            jumps = levels[jumps_index]/levels[jumps_index-1]
-            if alpha is None:
-                L1 = max(1,np.where(1/2**levels<=1/R(1))[0][0])
-                pa = lin_fit(np.arange(L1,L_num),np.log2(np.abs(E[L1:L_num]))); alpha = -pa[0]
-            # M_t = max(2,round(dt_c/dt_f))
-
-            if np.max(jumps_index)<E.size-3:
-                test = np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2)
-            else:
-                count=0
-                temp = 0
-                for i in range(L_num-4,L_num):
-                    if i in jumps_index:
-                        temp = max(np.abs(E[i])/(jumps[count]**alpha-1),temp)
-                        count+=1
-                    else:
-                        temp = max(np.abs(E[i])/(2**alpha-1),temp)
+        #     jumps_index = np.where(np.diff(levels)!=1)[0]+1
+        #     if jumps_index.size==0: jumps_index= np.array([0],dtype=np.int64)
+        #     jumps = levels[jumps_index]/levels[jumps_index-1]
+        #     if alpha is None:
+        #         L1 = max(1,np.where(1/2**levels<=1/R(1))[0][0])
+        #         pa = lin_fit(np.arange(L1,L_num),np.log2(np.abs(E[L1:L_num]))); alpha = -pa[0]
+        #     # M_t = max(2,round(dt_c/dt_f))
+        #
+        #     if np.max(jumps_index)<E.size-3:
+        #         test = np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2)
+        #     else:
+        #         count=0
+        #         temp = 0
+        #         for i in range(L_num-4,L_num):
+        #             if i in jumps_index:
+        #                 temp = max(np.abs(E[i])/(jumps[count]**alpha-1),temp)
+        #                 count+=1
+        #             else:
+        #                 temp = max(np.abs(E[i])/(2**alpha-1),temp)
         else:
             test=False
         # test = max(abs(0.5*E[L_num-2]),abs(E[L_num-1])) < np.sqrt(e2/2)
@@ -310,7 +307,6 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,tau=None,L=14,N_warm = 10
             print('WARNING: maximum capacity reached!')
             break
         print('New level')
-        print(levels[-1])
         if beta is None and gamma is None:
             N_diff = np.append(N_diff,N_warm).astype(np.int64)
             N = np.append(N,0).astype(np.int64)
@@ -481,18 +477,19 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         data = {}
         pd.set_option('max_columns',None)
         # levels = np.array([0,1,12,13]) One coarse level
-        levels = np.array([2,3],dtype=np.int64)
+        levels = np.array([6,7],dtype=np.int64)
+        # levels = np.array([3,4],dtype=np.int64)
         # Projected cost based on Multilevel Theorem
-        cost_e=0; l = 12
+        cost_e=0; l = 1
         e2 = 1/2**l
         WC = []
         print('Compile')
-        ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.15,beta=3.0,gamma=0.0,levels=levels)
+        # ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.15,beta=3.0,gamma=0.0,levels=levels)
         print('Compilation done')
-        while cost_e<6000:
+        while cost_e<3000:
             print(f'MSE= {e2}')
             start = time.perf_counter()
-            E,V,C,N,levels_out = ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.15,beta=3.0,gamma=0.0,levels=levels)
+            E,V,C,N,levels_out = ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.15,levels=levels)
             WC +=[time.perf_counter()-start]
             data[e2] = {'dt':(T-t0)/2**levels_out,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
             df = pd.DataFrame(data[e2])
@@ -509,8 +506,6 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             l+=1
             e2 = 1/2**l
             cost_e = c4/e2
-            if l==24:
-                break
 
         if save_file:
             name = f'wall_clock_time_{e2}'+logfile.name[7:]

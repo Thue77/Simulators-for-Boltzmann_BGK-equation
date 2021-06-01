@@ -22,7 +22,7 @@ from kinetic_diffusion.mc import KDMC
 from splitting.mc import mc as APSMC
 from splitting.mc import mc2_par as SMC_par
 from kinetic_diffusion.mc import Kinetic as KMC
-from splitting.mc import mc as SMC
+from splitting.mc import mc_standard as SMC
 from splitting.mc import mc1_par as APSMC_par
 from splitting.correlated import correlated_test,correlated,correlated_ts
 from kinetic_diffusion.correlated import correlated as KDCOR
@@ -111,20 +111,12 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         v = mu(x) + sigma(x)*v_norm
     elif radiative_transport:
         x = test1(N); v = np.random.uniform(-1,1,size=N)/epsilon
-        # x = np.zeros(N); v = np.zeros(N)
-        # U = np.random.uniform(size = int(N/3))
-        # x[:int(2*N/3)] = np.random.uniform(-0.5,0.5,size=int(2*N/3))
-        # x[int(2*N/3):] = (U<=0.5)* np.random.uniform(-1.0,-0.5,size=int(N/3)) + (U>0.5)* np.random.uniform(0.5,1.0,size=int(N/3))
-        # U = np.random.uniform(size = int(N/3))
-        # v[:int(2*N/3)] = np.random.uniform(-0.75,0.25,size=int(2*N/3))
-        # # print((U<=0.5)*np.random.uniform(-1.0,-0.75,size=int(N/3)))
-        # v[int(2*N/3):] = (U<=0.25)*np.random.uniform(-1.0,-0.75,size=int(N/3)) + (U>0.25)* np.random.uniform(0.25,1.0,size=int(N/3))
         v_norm = v/sigma(x)
     elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional) or (diffusion_limit and post_collisional):
-        # x,v,v_norm = test3(N)
-        x = np.ones(N)
+        x,v,v_norm = test3(N)
+        # x = np.ones(N)
         # print('Her')
-        v_norm = np.random.normal(0,1,size=N)
+        # v_norm = np.random.normal(0,1,size=N)
         v = v_norm/epsilon
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         x,v,v_norm = test2(N)
@@ -143,9 +135,9 @@ def Q_nu(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
         x = np.zeros(N)
         v_norm = v.copy()
     elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional) or (diffusion_limit and post_collisional):
-        # x,v,v_norm = test3(N)
         x = np.ones(N); v_norm = np.random.normal(0,1,size=N)
-        v = v_norm#*epsilon
+        x,v,v_norm = test3(N)
+        # v = v_norm.copy()
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         x,v,v_norm = test2(N)
         v=v_norm.copy()
@@ -167,13 +159,12 @@ def R(x):
 def r(x):
     if ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         return (-a*(x-0.5)+b)*(x<=0.5) + (a*(x-0.5)+b)*(x>0.5)
-        #return a*x+b
     else:
         return np.ones(len(x))
 
 def dR(x):
     if radiative_transport or correlated_time_test or one_step_dist:
-        return 0
+        return np.zeros(x.size)
     elif level_selection:
         return (x<=1)*(-b*a) + (x>1)*(b*a)
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
@@ -187,7 +178,7 @@ def R_anti(x):
     if radiative_transport or correlated_time_test or one_step_dist:
         return x/(epsilon**2)
     elif level_selection:
-        return (-b*a/2*x**2+b*(a+1)*x)*(x<=1) + (-b*a/2+b*(a+1) -b*a/2-b*(1-a)+b*a/2*x**2+b*(1-a)*x)*(x>1)#(-b*a/2*x**2 + (a+1)*b*x)*(x<=1) + (b*a/2*x**2+(1-a)*b*x)*(x>1)
+        return (-b*a/2*x**2+b*(a+1)*x)*(x<=1) + (-b*a/2+b*(a+1) -b*a/2-b*(1-a)+b*a/2*x**2+b*(1-a)*x)*(x>1)
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         return 1/epsilon**2*((-a*(x**2/2-0.5*x)+b*x)*(x<=0.5) + ((-a*(0.5**2/2-0.5*0.5)+b*0.5) + (a*(x**2/2-0.5*x)+b*x) - (a*(0.5**2/2-0.5*0.5)+b*0.5))*(x>0.5))
 
@@ -375,7 +366,7 @@ def SC(x,v,e):
                 # I_p=I_p*I; I_n=I_n*I;
     return dtau
 
-@njit(nogil=True,parallel=True)
+# @njit(nogil=True,parallel=True)
 def roots(x,v,e):
     if density_est or ml_test_APS or ml_test_KD or level_selection or diffusion_limit:
         alpha = -a/epsilon**2*(x<=0.5) + a/epsilon**2*(x>0.5)
@@ -388,7 +379,7 @@ def roots(x,v,e):
             r[i] = np.roots(np.flip(p[i,:]))[1]
         return r
 
-@njit(nogil=True,parallel = True)
+# @njit(nogil=True,parallel = True)
 def integral_to_boundary(x,bins,direction,slopes,intercepts):
     '''
     Calculates integral of R to the boundary in the direction of the velocity.
@@ -446,8 +437,6 @@ def M(x):
 def M_nu(x):
     '''Distribution of velocity NOT scaled by epsilon, i.e. nu'''
     if radiative_transport:
-        # v_norm = np.random.uniform(0,1)
-        # v_next = (1-v_norm*2)/epsilon
         v_next = np.random.uniform(-1,1,size=len(x))
         v_norm = v_next.copy()
     elif goldstein_taylor:
@@ -463,12 +452,12 @@ def M_nu(x):
     return v_next,v_norm
 
 def boundary_periodic(x):
-    x0 = 0; xL = 1#/epsilon
+    x0 = 0; xL = 1
     l = xL-x0 #Length of x domain
     I_low = (x<x0); I_high = (x>xL);
     x_new = x.copy()
-    x_new[I_low] = xL-((x0-x[I_low])%l)#x_new[I_low] + l#
-    x_new[I_high] = x0 + ((x[I_high]-xL)%l)#x_new[I_high] - l#
+    x_new[I_low] = xL-((x0-x[I_low])%l)
+    x_new[I_high] = x0 + ((x[I_high]-xL)%l)
     return x_new
 
 def boundary(x):
@@ -478,7 +467,7 @@ v_ms = 1#epsilon**2 if density_est or ml_test_APS else 1
 
 '''Function related to the quantity of interest, E(F(X,V))'''
 def F(x,v=0):
-    if goldstein_taylor: #or test == 'num_exp_ml':
+    if goldstein_taylor:# or ml_test_APS or ml_test_KD:
         return x**2
     else:
         return x
@@ -498,17 +487,17 @@ if __name__ == '__main__':
             print('Maybe the separator is wrong. Give the separator that fits with your operating system. It is done by adding the argument -sep "your_separator"')
             raise
     if ml_cost:
-        E2=1/2**np.arange(13,23)
+        E2=1/2**np.arange(12,20)
         start = 0
-        cost = []
-        for e2 in E2[start:]:
-            df = pd.read_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            L = len(df.get('N_l C_l'))-1
-            cost += [df.get('N_l C_l')[L]]
-        c4 = np.mean(cost*E2[start:]/np.log(np.sqrt(E2[start:])))
-        c4 += 2*c4
-        plt.plot(E2[start:],c4*np.log(np.sqrt(E2[start:])),label= r'$\mathcal{O}(\log(\sqrt{E})^2)$')
-        plt.plot(E2[start:],cost*E2[start:],label=r'APS')
+        # cost = []
+        # for e2 in E2[start:]:
+            # df = pd.read_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            # L = len(df.get('N_l C_l'))-1
+            # cost += [df.get('N_l C_l')[L]]
+        # plt.plot(E2[start:],c4*np.log(np.sqrt(E2[start:])),label= r'$\mathcal{O}(\log(E)^2)$')
+        # plt.plot(E2[start:],cost*E2[start:],label=r'APS')
+        # c4 = np.mean(cost*E2[start:]/np.log(np.sqrt(E2[start:])))
+        # c4 += 2*c4
 
         cost = []
         for e2 in E2[start:]:
@@ -517,11 +506,11 @@ if __name__ == '__main__':
             cost += [df.get('N_l C_l')[L]]
         plt.plot(E2[start:],cost*E2[start:],label=r'RAPSD w. weighted correlation')
         cost = []
-        for e2 in E2[start:]:
-            df = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_True_diff_True_std_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            L = len(df.get('N_l C_l'))-1
-            cost += [df.get('N_l C_l')[L]]
-        plt.plot(E2[start:],cost*E2[start:],label=r'RAPSD w. standard correlation')
+        # for e2 in E2[start:]:
+            # df = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_True_diff_True_std_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            # L = len(df.get('N_l C_l'))-1
+            # cost += [df.get('N_l C_l')[L]]
+        # plt.plot(E2[start:],cost*E2[start:],label=r'RAPSD w. standard correlation')
 
         cost = []
         for e2 in E2[start:]:
@@ -632,7 +621,7 @@ if __name__ == '__main__':
                 plt.xscale('log')
                 plt.legend()
                 plt.show()
-            else:
+            if type!= 'comp' and type != 'conv' and type != 'both':
                 sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
 
         else:
@@ -657,7 +646,7 @@ if __name__ == '__main__':
             # start = time.perf_counter()
             # x = SMC(dt,t0,T,N,eps,Q,M,r,rev=rev,diff=diff,v_ms=1)
             if type=='comp':
-                APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,convergence=False,rev=rev,diff=diff,v_ms=v_ms,std=std)
+                APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,convergence=False,rev=rev,diff=diff,v_ms=v_ms,std=std,)
             elif type=='conv':
                 APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=False,convergence=True,rev=rev,diff=diff,v_ms=v_ms,std=std)
             elif type=='both':
@@ -705,7 +694,8 @@ if __name__ == '__main__':
                 ax2.set_yscale('log')
                 ax2.set_xlim(max(dt_list),min(dt_list))
                 ax2.set_xlabel(r'$\Delta t$')
-                plt.legend()
+                ax2.set_ylabel(r'Wall clock time per path')
+                # plt.legend()
                 # plt.savefig(f'var_KD_eps_{epsilon}_a_{a}_b_{b}.png')
                 plt.figure()
                 plt.plot(range(1,dt_list.size),kur1[1:],':')
@@ -736,7 +726,7 @@ if __name__ == '__main__':
                 plt.xscale('log')
                 plt.legend()
                 plt.show()
-            else:
+            if type!= 'comp' and type != 'conv' and type != 'both':
                 sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
 
         else:
@@ -747,11 +737,21 @@ if __name__ == '__main__':
                 logfile = open(f'logfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            # # x1 = KDMC(1/2**12,N,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
+            print('Testing consistency')
+            # x_KD=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
+            # dist = pd.DataFrame(data={'x':x_KD,'Method':['KD' for _ in range(N)]})
+            # print('Done with KMC')
+            # x_AP = SMC_par((T-t0)/2**13,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
+            # print(f'x_ap^2: {np.mean(x_AP**2)}, x_KD^2 = {np.mean(x_KD**2)}')
+            # dist = dist.append(pd.DataFrame(data={'x':x_AP,'Method':['Splitting' for _ in range(N)]}))
+            # print(wasserstein_distance(x_AP,x_KD))
+            # sns.kdeplot(data=dist, x="x",hue='Method',cut=0,common_norm=False)
+            # plt.show()
+            # x1 = KDMC(1/2**12,N,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
             # x1 = KMC(N,Q,t0,T,mu,sigma,M,R,SC)
             # print(np.mean(x1**2))
-            # x2 = SMC(1/2**12,t0,T,N,epsilon,Q_nu,M_nu,r,rev=rev,diff=diff,v_ms=1)
-            # # x2 = APSMC(1/2**12,t0,T,N,epsilon,Q_nu,M_nu,r,boundary=boundary,rev=rev,diff=diff,v_ms=v_ms)
+            # x2 = SMC(1/2**12,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
+            # x2 = APSMC_par(1/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r,rev=rev,diff=diff,v_ms=v_ms)
             # print(np.mean(x2**2))
             # print(f'wasserstein_distance: {wasserstein_distance(x1,x2)}')
             # dist = pd.DataFrame(data={'x':x1,'Method':['KMC' for _ in range(N)]})
@@ -778,6 +778,9 @@ if __name__ == '__main__':
         else:
             logfile=None
         APML_test(N,N0,dt_list,E2,Q_nu,t0,T,M_t,epsilon,M_nu,r,F,logfile,complexity=True,convergence=False)
+
+
+
         # x_std = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
         # W,err=APSMC_density_test(dt_list,M_t,t0,T,N/10,epsilon,Q_nu,M_nu,r,F,boundary = boundary,x_std=x_std)
         # plt.errorbar(dt_list,W,err,label='Error APS GT dist')
@@ -793,12 +796,13 @@ if __name__ == '__main__':
         if N%8!=0 or N%80!=0:
             sys.exit('Please provide a number of paths divisible by 8 and 80')
         N0=40; T=1; dt_list = T/2**np.arange(0,17,1); t0=0; M_t=2
-        if False:
+        if True:
             print('Testing consistency')
             x_KD=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
             dist = pd.DataFrame(data={'x':x_KD,'Method':['KD' for _ in range(N)]})
             print('Done with KMC')
-            x_AP = SMC_par((T-t0)/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
+            x_AP = SMC_par((T-t0)/2**12,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
+            print(f'x_ap^2: {np.mean(x_AP**2)}, x_KD^2 = {np.mean(x_KD**2)}')
             dist = dist.append(pd.DataFrame(data={'x':x_AP,'Method':['Splitting' for _ in range(N)]}))
             print(wasserstein_distance(x_AP,x_KD))
             sns.kdeplot(data=dist, x="x",hue='Method',cut=0,common_norm=False)
@@ -928,19 +932,19 @@ if __name__ == '__main__':
         '''Numerical experiemnt on radiative transport with
         rho(x,0) = 1+cos(2*pi*(x+0.5)) and V ~ U(-1,1)'''
         x_lim = (0,1); v_lim = (-1,1)
-        N = 500_000
-        dt = 0.1e-5;t0=0;T=0.1
+        N = 400_000
+        dt =0.1/2**19 ;t0=0;T=0.1
         x = APSMC_par(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_periodic,r)
-        print('Done with APSMC')
+        print(f'Done with APSMC, x^2 = {np.mean(x**2)}')
         dist = pd.DataFrame(data={'x':x,'Method':['APS' for _ in range(N)]})
         x = KDMC_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary_periodic)
-        print('Done with KDMC')
+        print(f'Done with KDMC, x^2 = {np.mean(x**2)}')
         dist = dist.append(pd.DataFrame(data={'x':x,'Method':['KD' for _ in range(N)]}))
         x = SMC_par(dt,t0,T,N,epsilon,Q_nu,M_nu,boundary_periodic,r)
-        print('Done with SMC')
+        print(f'Done with SMC, x^2={np.mean(x**2)}')
         dist = dist.append(pd.DataFrame(data={'x':x,'Method':['SS' for _ in range(N)]}))
         x=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary_periodic)
-        print('Done with KMC')
+        print(f'Done with KMC, x^2={np.mean(x**2)}')
         dist = dist.append(pd.DataFrame(data={'x':x,'Method':['Kinetic' for _ in range(N)]}))
         sns.kdeplot(data=dist, x="x",hue='Method',cut=0,common_norm=False)
         plt.show()
@@ -1134,8 +1138,6 @@ if __name__ == '__main__':
                         np.savetxt(f,np.vstack((W,err)))
                     with open(f'density_resultfile_diffusion_limit_a_{a}_b_{b}_eps_{epsilon}_cost.txt','w') as f:
                         np.savetxt(f,cost)
-
-
 
     if one_step_dist:
         if N is None:
