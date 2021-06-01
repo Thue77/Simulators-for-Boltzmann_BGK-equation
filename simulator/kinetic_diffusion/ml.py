@@ -46,8 +46,6 @@ def warm_up(L,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,N=100,tau=None):
     C_l = np.zeros(L+1) ##Cost per path for each level
     C_l_L = np.zeros(L)
     x0,v0,v_l1_next = Q(N)
-    # e = np.random.exponential(scale=1,size=N)
-    # tau = SC(x0,v0,e)
     for l in prange(L+1):
         if l < L:
             with objmode(start1='f8'):
@@ -87,9 +85,6 @@ def select_levels(L,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,N=100,tau=None)
             l+=l
         else:
             break
-    # test = V_d > V[1:]
-    # if np.sum(test)>1:
-        # l = np.argwhere(test).flatten()[-1]+2 #Last index where variance of bias is larger than V
     levels = [l-1,l]
     V_min = V_d[l-1]
     for j in range(l,len(V_d)):
@@ -97,8 +92,7 @@ def select_levels(L,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,N=100,tau=None)
             levels += [j+1]
             V_min = V_d[j]
     L_set = np.array(levels)
-    # print(f'Last level: {len(V)-1}, levels: {L_set}')
-    # sys.exit()
+
     '''Set up output variables based on level selection and set values of non adjecant levels to zero'''
     Q_out = np.empty(len(L_set)) #List of ML estimates for each level
     V_out = np.empty(len(L_set)) #Variances of estimates on each level
@@ -127,6 +121,7 @@ def diff_np(a):
 
 @njit(nogil=True,parallel=True)
 def update_path_old(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,boundary):
+    ''''Depricated function'''
     for j in prange(len(I)):
         i=I[j]
         dt_f = (T-t0)/2**levels[i]
@@ -162,11 +157,13 @@ def update_path_old(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,R_anti,dR,bo
 
 # @njit(nogil=True)
 def rnd1(x, decimals, out):
+    '''Replacement for np.round. Needed for numba'''
     return np.round_(x, decimals, out)#.astype(np.int64)
 
 
-# @njit(nogil=True,parallel=True)
+@njit(nogil=True,parallel=True)
 def update_path(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary,update = True):
+    '''Method to update paths in parallel'''
     cores = 1 if update else 8
     n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff/cores)).astype(np.int64))
     # n = np.ones(2,dtype=np.int64)*2#np.maximum(np.ones(N_diff.size)*2,np.round(N_diff/cores,0,np.empty_like(N_diff/cores))).astype(np.int64)
@@ -233,12 +230,10 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,tau=None,L=14,N_warm = 10
     SS = np.maximum(0,(N-1)*V)
     '''Paths still needed to minimize total cost based on current information on variance and cost for each level'''
     N_diff = np.ones(L_num,dtype=np.int64)*N_warm - N
-    # print(f'N_diff: {N_diff}')
     '''While loop to continue until RMSE fits with e2'''
     while True:
         '''Update paths based on N_diff'''
         while np.max(N_diff)>0:
-            # print('update paths')
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*400_000)
             update = np.sum(N)==0 or (beta is None and gamma is None)
@@ -249,41 +244,16 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,tau=None,L=14,N_warm = 10
             if L_num > L_start and alpha is not None and False:
                 '''Find problematic/erratic bias values and require more paths for levels
                 with eratic bias values. Deprecated part of function'''
-                # index_bias = np.where((np.abs(E[L_start-1:-1])/np.abs(E[L_start:])< 2**(alpha/2)))[0] + 1
                 index_bias = np.where((np.abs(E[L_start-1:-1])/np.abs(E[L_start:])< 1))[0] + 1
                 index_bias = np.unique(np.append(index_bias,index_bias+1))
                 print(index_bias)
                 print(E)
-                # print((np.abs(E[1:-1])/np.abs(E[2:])))
                 N_diff[index_bias] += rnd1(N[index_bias]*0.1,0,np.empty_like(N[index_bias]*0.1)).astype(np.int64)
         '''Test bias is below e2/2'''
         if E.size>=4:
             test = np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2)
-            '''Find jumps in levels. For those jumps, it is not the case that dt_c=2*dt_f
-            Need to account for that when extrapolating values from previous levels.
-            '''
-        #     jumps_index = np.where(np.diff(levels)!=1)[0]+1
-        #     if jumps_index.size==0: jumps_index= np.array([0],dtype=np.int64)
-        #     jumps = levels[jumps_index]/levels[jumps_index-1]
-        #     if alpha is None:
-        #         L1 = max(1,np.where(1/2**levels<=1/R(1))[0][0])
-        #         pa = lin_fit(np.arange(L1,L_num),np.log2(np.abs(E[L1:L_num]))); alpha = -pa[0]
-        #     # M_t = max(2,round(dt_c/dt_f))
-        #
-        #     if np.max(jumps_index)<E.size-3:
-        #         test = np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2)
-        #     else:
-        #         count=0
-        #         temp = 0
-        #         for i in range(L_num-4,L_num):
-        #             if i in jumps_index:
-        #                 temp = max(np.abs(E[i])/(jumps[count]**alpha-1),temp)
-        #                 count+=1
-        #             else:
-        #                 temp = max(np.abs(E[i])/(2**alpha-1),temp)
         else:
             test=False
-        # test = max(abs(0.5*E[L_num-2]),abs(E[L_num-1])) < np.sqrt(e2/2)
         if test:
             break
         L_num += 1;
@@ -341,7 +311,6 @@ def convergence_tests(N,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary):
         for j in prange(cores):
             x0,v0,v_l1_next = Q(n)
             if l<L-1:
-                # print(f'l={l}')
                 with objmode(start1 = 'f8'):
                     start1 = time.perf_counter()
                 x_f,x_c = correlated(dt_list[l+1],dt_list[l],x0,v0,v_l1_next,t0,T,mu,sigma,M,R,SC,R_anti=R_anti,dR=dR,boundary=boundary)
@@ -412,18 +381,6 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
     if convergence:
         print('Convergence test')
         b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary)
-        # df = pd.DataFrame({'E(F(X^f)-F(X^c))': b,'E(F(X))': v,'var(F(X^f)-F(X^c))': var2,'var(F(X))':var1,'Kurtosis': kur1,'consistency check': cons,'cost(F(X^f)-F(X^c))':cost2,'cost(F(X))':cost1})
-        # pd.set_option('max_columns',None)
-        # print(df)
-        # print(f'E(F(X^f)-F(X^c)) = {b}')
-        # print(f'E(F(X)) = {v}')
-        # print(f'var(F(X^f)-F(X^c)) = {var2}')
-        # print(f'var(F(X)) = {var1}')
-        # print(f'Kurtosis = {kur1}')
-        # print(f'consistency check = {cons}')
-        # print(f'cost(F(X^f)-F(X^c)) = {cost2}')
-        # print(f'cost(F(X)) = {cost1}')
-        # Linear regression to estimate alpha, beta and gamma. Only test for dt << eps^2
         if save_file:
             np.savetxt('resultfile'+logfile.name[7:],(dt_list,v,b,var1,var2,cost1,cost2,kur1,cons))
             logfile.write('\n*********************************************************\n')
@@ -440,10 +397,6 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(b[i:])),1)[0]
         beta = -np.polyfit(range(i,var2.size),np.log2(np.abs(var2[i:])),1)[0]
         gamma = np.polyfit(range(i,var2.size),np.log2(np.abs(cost2[i:])),1)[0]
-        # L1 = np.where(dt_list<1/R(0))[0][1]
-        # pa = np.polyfit(range(L1,L),np.log2(np.abs(b[L1:L])),1); alpha = -pa[0]
-        # pb = np.polyfit(range(L1,L),np.log2(np.abs(var2[L1:L])),1); beta = -pb[0]
-        # pg = np.polyfit(range(L1,L),np.log2(np.abs(cost2[L1:L])),1); gamma = pg[0]
         print(f'alpha= {alpha}, beta = {beta}, gamma= {gamma}')
         if save_file:
             logfile.write(f'alpha = {alpha} (exponent for weak convergence) \n')
@@ -463,18 +416,11 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             logfile.write("*********************************************************\n")
             logfile.write(" e2 value mlmc_cost N_l dt \n")
             logfile.write("---------------------------------------------------------\n")
-        # if convergence:
-            # levels = select_levels_data(var1,var2[1:],t0,T)
-            # print(f'Levels selected: {levels}')
         else:
             levels=None
 
         data = {}
         pd.set_option('max_columns',None)
-        # levels = np.array([0,1,12,13]) One coarse level
-        # levels = np.array([6,7],dtype=np.int64)
-        # levels = np.array([3,4],dtype=np.int64)
-        # levels=None
         if convergence:
             '''Find index where they transition'''
             i = 0
@@ -484,12 +430,7 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                     break
                 i+=1
                 old=va
-            # print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
-            # print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
-            # print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
             alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(b[i:])),1)[0]
-            # print(f'slope of bias after:{alpha}')
-            # print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
             '''Complexity test based on estimations in convergence test'''
             dfs = {}
             pd.set_option('display.float_format', '{:.2E}'.format)
@@ -503,7 +444,6 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                 out=False
                 while not test:
                     L+=1
-                    # print(L)
                     if L>=v.size:
                         out = True
                         print(f'Warning!. Need more results to adhere to bias requirement for e2= {e2}')
@@ -517,7 +457,6 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                 if not out:
                     df = pd.DataFrame({'E':E,'V':V,'V[Y]':V/N,'C':C,'N':N,'N C':C*N,'dt':dt_list[i-1:min(L,v.size-1)]})
                     df = df.append(pd.DataFrame({'E':np.sum(E),'V':' ','V[Y]':[np.sum(V/N)],'C':[np.sum(C)],'N':' ','N C':[np.dot(C,N)],'dt':' '}),ignore_index=True)
-                    # print(df)
                     dfs[e2] = df
                     if save_file:
                         name = f'resultfile_complexity_{e2}'+logfile.name[7:]
@@ -545,7 +484,6 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             ax2.set_ylabel(r'Total costs')
             ax1.set_xlabel(r'Levels')
             ax1.set_ylabel(r'Paths')
-            # ax2.legend()
             ax1.legend()
             if save_file:
                 filename = f'complexity_results'+logfile.name[7:-3]
@@ -575,7 +513,7 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                     df.to_csv(name,index=False)
                     logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {(T-t0)/2**levels_out} \n")
                 #Actual simulation cost
-                cost_s = WC[-1]#np.dot(C,N)
+                cost_s = WC[-1]
                 #Constant from Theorem
                 c4 = cost_s*e2
                 l+=1
@@ -585,19 +523,6 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             if save_file:
                 name = f'wall_clock_time_{e2}'+logfile.name[7:]
                 np.savetxt(name,WC)
-        # for e2 in E2:
-        #     print(f'MSE: {e2}')
-        #     start = time.time()
-        #     E,V,C,N,levels_out = ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.15,levels=levels)
-        #     print(f'Time: {time.time()-start}')
-        #     data[e2] = {'dt':(T-t0)/2**levels_out,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
-        #     df = pd.DataFrame(data[e2])
-        #     df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in data[e2]['E']])],'V_l':' ','V[E]':[np.sum([v for v in data[e2]['V[E]']])],'C_l':[np.sum([c for c in data[e2]['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(data[e2]['N_l'],data[e2]['C_l']))]}))
-        #     print(df)
-        #     if save_file:
-        #         name = f'resultfile_complexity_{e2}'+logfile.name[7:]
-        #         df.to_csv(name,index=False)
-        #         logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {(T-t0)/2**levels_out} \n")
 
 
 
@@ -611,7 +536,6 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
         plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
         plt.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
-        # plt.title(f'Plot of variance and bias')
         plt.xscale('log')
         plt.yscale('log')
         plt.xlim(max(dt_list),min(dt_list))
