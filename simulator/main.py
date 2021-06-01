@@ -486,58 +486,59 @@ if __name__ == '__main__':
             print('Maybe the separator is wrong. Give the separator that fits with your operating system. It is done by adding the argument -sep "your_separator"')
             raise
     if ml_cost:
-        E2=1/2**np.arange(12,20)
+        E2=1/2**np.arange(13,22)
         start = 0
-        # cost = []
-        # for e2 in E2[start:]:
-            # df = pd.read_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            # L = len(df.get('N_l C_l'))-1
-            # cost += [df.get('N_l C_l')[L]]
-        # plt.plot(E2[start:],c4*np.log(np.sqrt(E2[start:])),label= r'$\mathcal{O}(\log(E)^2)$')
-        # plt.plot(E2[start:],cost*E2[start:],label=r'APS')
-        # c4 = np.mean(cost*E2[start:]/np.log(np.sqrt(E2[start:])))
-        # c4 += 2*c4
+        cost = []
+        for e2 in E2[start:]:
+            df = pd.read_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            print(df)
+            L = len(df.get('N C'))-1
+            cost += [df.get('N C')[L]]
+        plt.plot(np.sqrt(E2[start:]),cost,label=r'APS')
 
         cost = []
         for e2 in E2[start:]:
             df = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_True_diff_True_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            L = len(df.get('N_l C_l'))-1
-            cost += [df.get('N_l C_l')[L]]
-        plt.plot(E2[start:],cost*E2[start:],label=r'RAPSD w. weighted correlation')
+            L = len(df.get('N C'))-1
+            cost += [df.get('N C')[L]]
+        plt.plot(np.sqrt(E2[start:]),cost,label=r'RAPSD w. weighted correlation')
+        c4 = np.mean(cost*E2[start:]/np.log(np.sqrt(E2[start:]))**2)
+        c4 *= 6
+        plt.plot(np.sqrt(E2[start:]),c4*np.log(np.sqrt(E2[start:]))**2/E2[start:],label= r'$\mathcal{O}(\log(E)^2E^{-2})$')
         cost = []
-        # for e2 in E2[start:]:
-            # df = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_True_diff_True_std_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            # L = len(df.get('N_l C_l'))-1
-            # cost += [df.get('N_l C_l')[L]]
-        # plt.plot(E2[start:],cost*E2[start:],label=r'RAPSD w. standard correlation')
+        for e2 in E2[start:]:
+            df = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_True_diff_True_std_for_a={a}_b={b}_epsilon={epsilon}.txt')
+            L = len(df.get('N C'))-1
+            cost += [df.get('N C')[L]]
+        plt.plot(np.sqrt(E2[start:]),cost,label=r'RAPSD w. standard correlation')
 
         cost = []
         for e2 in E2[start:]:
             df = pd.read_csv(f'resultfile_complexity_{e2}_APS_rev_False_diff_True_for_a={a}_b={b}_epsilon={epsilon}.txt')
-            L = len(df.get('N_l C_l'))-1
-            cost += [df.get('N_l C_l')[L]]
-        plt.plot(E2[start:],cost*E2[start:],label=r'APSD')
+            L = len(df.get('N C'))-1
+            cost += [df.get('N C')[L]]
+        plt.plot(np.sqrt(E2[start:]),cost,label=r'APSD')
 
         cost = []
         for e2 in E2[start:]:
             df = pd.read_csv(f'resultfile_complexity_{e2}_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
             # print(dfs[e2])
-            L = len(df.get('N_l C_l'))-1
-            cost += [df.get('N_l C_l')[L]]
+            L = len(df.get('N C'))-1
+            cost += [df.get('N C')[L]]
         # CE2 = cost*E2
         c4 = np.mean(cost*E2[start:])
-        c4 *= 2
-        plt.plot(E2[start:],c4*np.ones(E2[start:].size),label= r'$\mathcal{O}(1)$')
-        plt.plot(E2[start:],cost*E2[start:],label=r'KD')
+        c4 *= 1.5
+        plt.plot(np.sqrt(E2[start:]),c4/E2[start:],label= r'$\mathcal{O}(E^{-2})$')
+        plt.plot(np.sqrt(E2[start:]),cost,label=r'KD')
 
         plt.yscale('log')
         plt.xscale('log')
-        plt.xlabel(r'$E^2$')
-        plt.ylabel(r'$Cost*E^2$')
+        plt.xlabel(r'$E$')
+        plt.ylabel(r'$Cost$')
         plt.legend()
         plt.show()
     if ml_test_APS:
-        E2=1/2**np.arange(0,16)
+        E2=1/2**np.arange(10,26)
         # type = str(input('For complexity results write "comp" and for convergence results write "conv". For both write "both"\n'))
         if uf:
             if type == 'conv' or type == 'both':
@@ -550,21 +551,52 @@ if __name__ == '__main__':
                         (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt')
 
                 '''Find index where they transition'''
-                i = 1
+                i = 0
                 old = 0
                 for va in var2[1:]:
                     if va < old:
                         break
                     i+=1
                     old=va
-                print(f'dt: {dt_list[i]}, index: {i}')
-                print(f'var: {var2}')
-                print(f'bias: {bias}')
-                # print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
-                print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
-                # print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
-                print(f'slope of bias after:{np.polyfit(range(i,bias.size),np.log2(np.abs(bias[i:])),1)}')
-                print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
+                alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)[0]
+                '''Complexity test based on numercial estimations'''
+                dfs = {}
+                pd.set_option('display.float_format', '{:.2E}'.format)
+                for e2 in E2:
+                    L=4 + i
+                    E = np.append(v[i],bias[i:L])
+                    V = np.append(var1[i],var2[i:L])
+                    C = np.append(cost1[i],cost2[i:L])
+                    N = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C)))
+                    test = (np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2))
+                    out=False
+                    while not test:
+                        L+=1
+                        # print(L)
+                        if L>=v.size:
+                            out = True
+                            print(f'Warning!. Need more results to adhere to bias requirement for e2= {e2}')
+                            break
+                        N = np.append(N,0)
+                        E = np.append(E,bias[L])
+                        V = np.append(V,var2[L])
+                        C = np.append(C,cost2[L])
+                        N += np.maximum(0,np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64))
+                        test = (np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2))
+                    if not out:
+                        df = pd.DataFrame({'E':E,'V':V,'V[Y]':V/N,'C':C,'N':N,'N C':C*N,'dt':dt_list[i-1:min(L,v.size-1)]})
+                        df = df.append(pd.DataFrame({'E':np.sum(E),'V':' ','V[Y]':[np.sum(V/N)],'C':[np.sum(C)],'N':' ','N C':[np.dot(C,N)],'dt':' '}),ignore_index=True)
+                        # if not rev and not diff:
+                        #     df.to_csv(f'resultfile_complexity_{e2}_APS_for_a={a}_b={b}_epsilon={epsilon}.txt',index=False)
+                        # else:
+                        #     if std:
+                        #         df.to_csv(f'resultfile_complexity_{e2}_APS_rev_{rev}_diff_{diff}_std_for_a={a}_b={b}_epsilon={epsilon}.txt',index=False)
+                        #     else:
+                        #         df.to_csv(f'resultfile_complexity_{e2}_APS_rev_{rev}_diff_{diff}_for_a={a}_b={b}_epsilon={epsilon}.txt',index=False)
+                        print(df)
+                        dfs[e2] = df
+                    else:
+                        break
 
                 fig,ax = plt.subplots()
                 ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
@@ -653,8 +685,7 @@ if __name__ == '__main__':
             else:
                 sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
     if ml_test_KD:
-        E2=1/2**np.arange(13,26)
-        # type = str(input('For complexity results write "comp" and for convergence results write "conv". For both write "both"\n'))
+        E2=1/2**np.arange(10,26)
         if uf:
             if type == 'conv' or type == 'both':
                 (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
@@ -668,12 +699,7 @@ if __name__ == '__main__':
                         break
                     i+=1
                     old=va
-                print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
-                print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
-                print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
                 alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)[0]
-                print(f'slope of bias after:{alpha}')
-                print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
                 '''Complexity test based on numercial estimations'''
                 dfs = {}
                 pd.set_option('display.float_format', '{:.2E}'.format)
@@ -687,7 +713,6 @@ if __name__ == '__main__':
                     out=False
                     while not test:
                         L+=1
-                        # print(L)
                         if L>=v.size:
                             out = True
                             print(f'Warning!. Need more results to adhere to bias requirement for e2= {e2}')
@@ -701,11 +726,11 @@ if __name__ == '__main__':
                     if not out:
                         df = pd.DataFrame({'E':E,'V':V,'V[Y]':V/N,'C':C,'N':N,'N C':C*N,'dt':dt_list[i-1:min(L,v.size-1)]})
                         df = df.append(pd.DataFrame({'E':np.sum(E),'V':' ','V[Y]':[np.sum(V/N)],'C':[np.sum(C)],'N':' ','N C':[np.dot(C,N)],'dt':' '}),ignore_index=True)
-                        # print(df)
+                        # df.to_csv(f'resultfile_complexity_{e2}_KD_for_a={a}_b={b}_epsilon={epsilon}.txt',index=False)
                         dfs[e2] = df
+                        print(df)
                     else:
                         break
-                # print(dfs)
                 print(L)
                 '''Plotting number of paths and computational costs as functions of MSE'''
                 fig, (ax1, ax2) = plt.subplots(2, 1)
