@@ -430,10 +430,20 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             logfile.write('\n*** Linear regression estimates of MLMC paramters ***\n')
             logfile.write(f'\n*** regression is done for levels with dt << eps^2 = {eps**2} ***\n')
             logfile.write('*********************************************************\n')
-        L1 = np.where(dt_list<1/R(0))[0][1]
-        pa = np.polyfit(range(L1,L),np.log2(np.abs(b[L1:L])),1); alpha = -pa[0]
-        pb = np.polyfit(range(L1,L),np.log2(np.abs(var2[L1:L])),1); beta = -pb[0]
-        pg = np.polyfit(range(L1,L),np.log2(np.abs(cost2[L1:L])),1); gamma = pg[0]
+        i = 0
+        old = 0
+        for va in var2[1:]:
+            if va < old:
+                break
+            i+=1
+            old=va
+        alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(b[i:])),1)[0]
+        beta = -np.polyfit(range(i,var2.size),np.log2(np.abs(var2[i:])),1)[0]
+        alpha = np.polyfit(range(i,var2.size),np.log2(np.abs(cost2[i:])),1)[0]
+        # L1 = np.where(dt_list<1/R(0))[0][1]
+        # pa = np.polyfit(range(L1,L),np.log2(np.abs(b[L1:L])),1); alpha = -pa[0]
+        # pb = np.polyfit(range(L1,L),np.log2(np.abs(var2[L1:L])),1); beta = -pb[0]
+        # pg = np.polyfit(range(L1,L),np.log2(np.abs(cost2[L1:L])),1); gamma = pg[0]
         print(f'alpha= {alpha}, beta = {beta}, gamma= {gamma}')
         if save_file:
             logfile.write(f'alpha = {alpha} (exponent for weak convergence) \n')

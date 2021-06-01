@@ -295,10 +295,16 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
                 logfile.write(f'{i} {dt_list[i]} {b[i]} {v[i]} {var2[i]} {var1[i]} {cost2[i]} {cost1[i]} {kur1[i]} {cons[i]}\n')
 
         # Linear regression to estimate alpha, beta and gamma. Only test for dt << eps^2
-        L1 = np.where(dt_list<eps**2/(r(np.array([0]))))[0][1]
-        pa = np.polyfit(range(L1,L),np.log2(np.abs(b[L1:L])),1); alpha = -pa[0]
-        pb = np.polyfit(range(L1,L),np.log2(np.abs(var2[L1:L])),1); beta = -pb[0]
-        pg = np.polyfit(range(L1,L),np.log2(np.abs(cost2[L1:L])),1); gamma = pg[0]
+        i = 0
+        old = 0
+        for va in var2[1:]:
+            if va < old:
+                break
+            i+=1
+            old=va
+        alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(b[i:])),1)[0]
+        beta = -np.polyfit(range(i,var2.size),np.log2(np.abs(var2[i:])),1)[0]
+        alpha = np.polyfit(range(i,var2.size),np.log2(np.abs(cost2[i:])),1)[0]
         print(f'alpha= {alpha}, beta = {beta}, gamma= {gamma}')
         if save_file:
             np.savetxt('resultfile'+logfile.name[7:],(dt_list,v,b,var1,var2,cost1,cost2,kur1,cons))
