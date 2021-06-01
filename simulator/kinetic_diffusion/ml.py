@@ -167,7 +167,7 @@ def rnd1(x, decimals, out):
 
 # @njit(nogil=True,parallel=True)
 def update_path(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary,update = True):
-    cores = 1# if update else 8
+    cores = 1 if update else 8
     n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff/cores)).astype(np.int64))
     # n = np.ones(2,dtype=np.int64)*2#np.maximum(np.ones(N_diff.size)*2,np.round(N_diff/cores,0,np.empty_like(N_diff/cores))).astype(np.int64)
     # for i,Nd in enumerate(N_diff):
@@ -312,7 +312,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,tau=None,L=14,N_warm = 10
 @njit(nogil=True,parallel=True)
 def convergence_tests(N,dt_list,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary):
     '''Calculates values for consistency test for each level given by dt_list'''
-    cores = 8 #Controls parrelisation
+    cores = 64 #Controls parrelisation
 
     L = dt_list.size
     # sys.exit()
