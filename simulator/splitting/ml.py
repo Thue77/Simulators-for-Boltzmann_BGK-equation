@@ -11,7 +11,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def select_levels(t0,T,M_t,eps,r,F,strategy=1,cold_start=True,N=100,boundary=None):
     '''
     strategy: indicates if strategy 1 or 2 is used
@@ -20,14 +20,15 @@ def select_levels(t0,T,M_t,eps,r,F,strategy=1,cold_start=True,N=100,boundary=Non
     '''
     if strategy==1:
         # dt_0 = np.minimum((eps)**2/r(np.array([0])),T-t0)
-        dt_0 = 1/2**4
+        dt_0 = 1/2**8
         levels = dt_0/M_t**np.arange(0,2)#np.array([dt_0,dt_0/M_t])
         N_out=np.zeros(2,dtype=np.int64)
         N_diff=np.ones(2,dtype=np.int64)*N
         SS_out = np.zeros(2);C_out = np.zeros(2); E_out=np.zeros(2)
     else:
-        dt_1 = np.minimum(eps**2/r(np.array([0])),T-t0)
-        levels = np.append(np.array([T-t0]),dt_1/M_t**np.arange(0,3))
+        # dt_1 = np.minimum(eps**2/r(np.array([0])),T-t0)
+        dt_1 = 1/2**7
+        levels = np.append(np.array([T-t0]),dt_1/M_t**np.arange(0,2))
         # levels = np.array([float(T-t0),dt_1,dt_1/M_t])
         N_out=np.zeros(3,dtype=np.int64)
         N_diff=np.ones(3,dtype=np.int64)*N
@@ -36,13 +37,13 @@ def select_levels(t0,T,M_t,eps,r,F,strategy=1,cold_start=True,N=100,boundary=Non
 
 
 def rnd1(x, decimals, out):
-    return np.round_(x, decimals, out).astype(np.int64)
+    return np.round_(x, decimals, out)#.astype(np.int64)
 
-@njit(nogil=True,parallel=True)
+# @njit(nogil=True,parallel=True)
 def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy=1,rev=False,diff=False,v_ms=1,std=False,update=True):
     # levels = ll.copy()
-    cores = 1 if np.sum(N)==0 else 8
-    n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff)).astype(np.int64))
+    cores = 1 if update else 8
+    n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff/cores)).astype(np.int64))
     for j in range(len(I)):
         i=I[j]
         # print(i)
@@ -89,7 +90,7 @@ def update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy
     return E,SS,N,C
 
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,beta=None,gamma=None,rev=False,diff=False,v_ms=1,std=False):
     '''
     e2: bound on mean square error
@@ -120,7 +121,7 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
             I = np.where(N_diff > 0)[0] #Index for Levels that need more paths
             N_diff = np.minimum(N_diff,np.ones(len(N_diff),dtype=np.int64)*400_000)
             # print(f'index where more paths are needed: {I}, N_diff: {N_diff}')
-            first = np.sum(N)==0
+            first = np.sum(N)==0 or (beta is None and gamma is None)
             E,SS,N,C = update_paths(I,E,SS,C,N,N_diff,levels,t0,T,M_t,eps,Q,M,r,F,boundary,strategy,rev=rev,diff=diff,v_ms=v_ms,std=std,update=first)
             if first: V = SS/(N-1) #Update variance
             '''Determine number of paths needed with new information'''
@@ -128,10 +129,10 @@ def ml(e2,Q,t0,T,M_t,eps,M,r,F,N_warm=40,boundary=None,strategy=1,alpha=None,bet
         '''Test bias is below e2/2 - to do so it is necessary to know exponent
         in weak error'''
         # test = max(abs(0.5*E[L-2]),abs(E[L-1])) < np.sqrt(e2/2)
-        if E.size>=4:
+        if (E.size>=4 and strategy==1) or (strategy==3 and E.size>4):
             if alpha is None:
                 L1 = max(1,np.where(levels<=eps**2/r(1))[0][0])
-                pa = lin_fit(np.arange(L1,L),np.log2(np.abs(E[L1:L]))); alpha = -pa[0]
+                pa = lin_fit(np.arange(L1,L),np.log2(np.abs(E[L1:L+1]))); alpha = -pa[0]
             test = np.max(np.abs(E[-3:]))/(M_t**alpha-1) < np.sqrt(e2/2)
         else:
             test=False
@@ -175,7 +176,7 @@ def lin_fit(x,y):
 @njit(nogil=True,parallel=True)
 def convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary,strategy,rev=False,diff=False,v_ms=1,std=False):
     '''Calculates values for consistency test for each level given by dt_list'''
-    cores = 64 #Controls parrelisation
+    cores = 8 #Controls parrelisation
 
     L = dt_list.size
     b = np.zeros(L) #mean(F(x^f)-F(X^c))
@@ -288,6 +289,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         print('Convergence test')
         b,b2,b3,b4,v,v2,var1,var2,kur1,cons,cost1,cost2 = convergence_tests(N,dt_list,Q,t0,T,M_t,eps,M,r,F,boundary=boundary,strategy=strategy,rev=rev,diff=diff,v_ms=v_ms,std=std)
         print('Convergence test DONE')
+        print(kur1)
         if save_file:
             for i in range(dt_list.size):
                 logfile.write(f'{i} {dt_list[i]} {b[i]} {v[i]} {var2[i]} {var1[i]} {cost2[i]} {cost1[i]} {kur1[i]} {cons[i]}\n')
@@ -330,40 +332,111 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         #         df.to_csv(name,index=False)
         #         logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {levels} \n")
 
-        # Projected cost based on Multilevel Theorem
-        cost_e=0; l = 12
-        e2 = 1/2**l
-        # Wall clock time
-        WC = []
-        print('Compile')
-        ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=1.0,beta=1.0,gamma=1.0,rev=rev,diff=diff)
-        print('Compilation done')
-        while cost_e<6000:
-            print(f'MSE= {e2}')
-            start = time.perf_counter()
-            E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=1.0,beta=1.0,gamma=1.0,rev=rev,diff=diff)
-            WC += [time.perf_counter()-start]
-            data[e2] = {'dt':levels,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
-            df = pd.DataFrame(data[e2])
-            df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in data[e2]['E']])],'V_l':' ','V[E]':[np.sum([v for v in data[e2]['V[E]']])],'C_l':[np.sum([c for c in data[e2]['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(data[e2]['N_l'],data[e2]['C_l']))]}))
-            print(df)
-            if save_file:
-                name = f'resultfile_complexity_{e2}'+logfile.name[7:]
-                df.to_csv(name,index=False)
-                logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {levels} \n")
-            #Actual simulation cost
-            cost_s = np.dot(C,N)
-            #Constant from Theorem
-            c4 = c4 = cost_s*e2/(np.log(np.sqrt(e2))**2)
-            l+=1
-            e2 = 1/2**l
-            cost_e = c4*np.log(np.sqrt(e2))**2/e2
-            if l==24:
-                break
 
-        if save_file:
-            name = f'wall_clock_time_{e2}'+logfile.name[7:]
-            np.savetxt(name,WC)
+        if convergence:
+            '''Find index where they transition'''
+            i = 0
+            old = 0
+            for va in var2[1:]:
+                if va < old:
+                    break
+                i+=1
+                old=va
+            # print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
+            # print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
+            # print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
+            alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)[0]
+            # print(f'slope of bias after:{alpha}')
+            # print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
+            '''Complexity test based on estimations in convergence test'''
+            dfs = {}
+            pd.set_option('display.float_format', '{:.2E}'.format)
+            for e2 in E2:
+                L=4 + i
+                E = np.append(v[i],bias[i:L])
+                V = np.append(var1[i],var2[i:L])
+                C = np.append(cost1[i],cost2[i:L])
+                N = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C)))
+                test = (np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2))
+                out=False
+                while not test:
+                    L+=1
+                    # print(L)
+                    if L>=v.size:
+                        out = True
+                        print(f'Warning!. Need more results to adhere to bias requirement for e2= {e2}')
+                        break
+                    N = np.append(N,0)
+                    E = np.append(E,bias[L])
+                    V = np.append(V,var2[L])
+                    C = np.append(C,cost2[L])
+                    N += np.maximum(0,np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64))
+                    test = (np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2))
+                if not out:
+                    df = pd.DataFrame({'E':E,'V':V,'V[Y]':V/N,'C':C,'N':N,'N C':C*N,'dt':dt_list[i-1:min(L,v.size-1)]})
+                    df = df.append(pd.DataFrame({'E':np.sum(E),'V':' ','V[Y]':[np.sum(V/N)],'C':[np.sum(C)],'N':' ','N C':[np.dot(C,N)],'dt':' '}),ignore_index=True)
+                    # print(df)
+                    dfs[e2] = df
+            # print(dfs)
+            print(L)
+            '''Plotting number of paths and computational costs as functions of MSE'''
+            fig, (ax1, ax2) = plt.subplots(1, 2)
+            N = []
+            Cost = []
+            end = len(dfs)
+            start = end-min(end,6)
+            for e2 in E2[start:end]:
+                N += [dfs[e2]['N'][:-1]]
+                Cost += [dfs[e2]['N C'][N[-1].size]]
+                # print(Cost)
+                ax1.plot(range(N[-1].size),N[-1],label=r'$E^2 = ${:.2E}'.format(e2))
+            ax2.loglog(E2[start:end],Cost,label='KD')
+            c4 = np.mean(Cost*E2[start:end])
+            c4 *= 2
+            ax2.plot(E2[start:end],c4*1/E2[start:end],label= r'$\mathcal{O}(E^{-2})$')
+            ax1.set_yscale('log')
+            ax2.set_xlabel(r'$E^2$')
+            ax2.set_ylabel(r'Total costs')
+            ax1.set_xlabel(r'Levels')
+            ax1.set_ylabel(r'Paths')
+            ax2.legend()
+            ax1.legend()
+            if save_file:
+                filename = f'complexity_results'+logfile.name[7:]
+                plt.savefig(filename)
+
+        else:
+            # Projected cost based on Multilevel Theorem
+            cost_e=0; l = 1
+            e2 = 1/2**l
+            # Wall clock time
+            WC = []
+            print('Compile')
+            # ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=1.0,beta=1.0,gamma=1.0,rev=rev,diff=diff)
+            print('Compilation done')
+            while cost_e<3000:
+                print(f'MSE= {e2}')
+                start = time.perf_counter()
+                E,V,C,N,levels = ml(e2,Q,t0,T,M_t,eps,M,r,F,N0,boundary=boundary,strategy=strategy,alpha=1.0,rev=rev,diff=diff)
+                WC += [time.perf_counter()-start]
+                data[e2] = {'dt':levels,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
+                df = pd.DataFrame(data[e2])
+                df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in data[e2]['E']])],'V_l':' ','V[E]':[np.sum([v for v in data[e2]['V[E]']])],'C_l':[np.sum([c for c in data[e2]['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(data[e2]['N_l'],data[e2]['C_l']))]}))
+                print(df)
+                if save_file:
+                    name = f'resultfile_complexity_{e2}'+logfile.name[7:]
+                    df.to_csv(name,index=False)
+                    logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {levels} \n")
+                #Actual simulation cost
+                cost_s = WC[-1]#np.dot(C,N)
+                #Constant from Theorem
+                c4 = c4 = cost_s*e2/(np.log(np.sqrt(e2))**2)
+                l+=1
+                e2 = 1/2**l
+                cost_e = c4*np.log(np.sqrt(e2))**2/e2
+            if save_file:
+                name = f'wall_clock_time_{e2}'+logfile.name[7:]
+                np.savetxt(name,WC)
 
 
     if save_file:
@@ -375,14 +448,17 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
         plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
         plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
         plt.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
-        plt.title(f'Plot of variance and bias')
+        # plt.title(f'Plot of variance and bias')
         plt.xscale('log')
         plt.yscale('log')
         plt.legend()
+        if save_file:plt.savefig(f'var_bias'+logfile.name[7:])
         plt.figure()
         plt.plot(range(1,L),kur1[1:],':',label='kurtosis')
         plt.title(f'Plot of kurtosis')
+        if save_file:plt.savefig(f'kurtosis'+logfile.name[7:])
         plt.figure()
         plt.plot(range(1,L),cons[1:],':',label='kurtosis')
         plt.title(f'Plot check of consistency')
-        plt.show()
+        if save_file:plt.savefig(f'consistency_check'+logfile.name[7:])
+        if not save_file:plt.show()
