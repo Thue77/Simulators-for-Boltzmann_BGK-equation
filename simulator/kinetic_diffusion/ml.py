@@ -474,12 +474,12 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                     break
                 i+=1
                 old=va
-            print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
-            print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
-            print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
+            # print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
+            # print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
+            # print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
             alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)[0]
-            print(f'slope of bias after:{alpha}')
-            print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
+            # print(f'slope of bias after:{alpha}')
+            # print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
             '''Complexity test based on estimations in convergence test'''
             dfs = {}
             pd.set_option('display.float_format', '{:.2E}'.format)
@@ -566,9 +566,9 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                 e2 = 1/2**l
                 cost_e = c4/e2
 
-        if save_file:
-            name = f'wall_clock_time_{e2}'+logfile.name[7:]
-            np.savetxt(name,WC)
+            if save_file:
+                name = f'wall_clock_time_{e2}'+logfile.name[7:]
+                np.savetxt(name,WC)
         # for e2 in E2:
         #     print(f'MSE: {e2}')
         #     start = time.time()
