@@ -499,7 +499,7 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                         print(f'Warning!. Need more results to adhere to bias requirement for e2= {e2}')
                         break
                     N = np.append(N,0)
-                    E = np.append(E,bias[L])
+                    E = np.append(E,b[L])
                     V = np.append(V,var2[L])
                     C = np.append(C,cost2[L])
                     N += np.maximum(0,np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64))
