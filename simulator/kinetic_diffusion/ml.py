@@ -477,7 +477,7 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             # print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
             # print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
             # print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
-            alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)[0]
+            alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(b[i:])),1)[0]
             # print(f'slope of bias after:{alpha}')
             # print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
             '''Complexity test based on estimations in convergence test'''
@@ -485,7 +485,7 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             pd.set_option('display.float_format', '{:.2E}'.format)
             for e2 in E2:
                 L=4 + i
-                E = np.append(v[i],bias[i:L])
+                E = np.append(v[i],b[i:L])
                 V = np.append(var1[i],var2[i:L])
                 C = np.append(cost1[i],cost2[i:L])
                 N = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C)))
