@@ -115,9 +115,8 @@ def Q(N) -> Tuple[np.ndarray,np.ndarray,np.ndarray]:
     elif (density_est and post_collisional) or (ml_test_KD and post_collisional) or (ml_test_APS and post_collisional) or (diffusion_limit and post_collisional):
         x,v,v_norm = test3(N)
         # x = np.ones(N)
-        # print('Her')
         # v_norm = np.random.normal(0,1,size=N)
-        v = v_norm/epsilon
+        v = mu(x)+ sigma(x)*v_norm#/epsilon
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         x,v,v_norm = test2(N)
         v = v/epsilon
@@ -428,7 +427,7 @@ def M(x):
         v_norm = v_next/sigma(x)
     elif ml_test_KD or ml_test_APS or density_est or diffusion_limit:
         v_norm = np.random.normal(0,1,size=x.size)
-        v_next = v_norm/epsilon
+        v_next = mu(x) + sigma(x)*v_norm#/epsilon
     else:
         v_norm = np.random.normal(0,1,size=x.size)
         v_next = mu(x) + sigma(x)*v_norm
@@ -467,7 +466,7 @@ v_ms = 1#epsilon**2 if density_est or ml_test_APS else 1
 
 '''Function related to the quantity of interest, E(F(X,V))'''
 def F(x,v=0):
-    if goldstein_taylor:# or ml_test_APS or ml_test_KD:
+    if goldstein_taylor or ml_test_KD:
         return x**2
     else:
         return x
@@ -654,28 +653,82 @@ if __name__ == '__main__':
             else:
                 sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
     if ml_test_KD:
-        E2=1/2**np.arange(13,24)
+        E2=1/2**np.arange(13,26)
         # type = str(input('For complexity results write "comp" and for convergence results write "conv". For both write "both"\n'))
         if uf:
             if type == 'conv' or type == 'both':
                 (dt_list,v,bias,var1,var2,cost1,cost2,kur1,cons) = np.loadtxt(f'resultfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt')
 
+
                 '''Find index where they transition'''
-                i = 1
+                i = 0
                 old = 0
                 for va in var2[1:]:
                     if va < old:
                         break
                     i+=1
                     old=va
-                print(f'dt: {dt_list[i]}, index: {i}')
-                print(f'var: {var2}')
-                print(f'bias: {bias}')
                 print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
                 print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
                 print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
-                print(f'slope of bias after:{np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)}')
+                alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)[0]
+                print(f'slope of bias after:{alpha}')
                 print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
+                '''Complexity test based on numercial estimations'''
+                dfs = {}
+                pd.set_option('display.float_format', '{:.2E}'.format)
+                for e2 in E2:
+                    L=4 + i
+                    E = np.append(v[i],bias[i:L])
+                    V = np.append(var1[i],var2[i:L])
+                    C = np.append(cost1[i],cost2[i:L])
+                    N = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C)))
+                    test = (np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2))
+                    out=False
+                    while not test:
+                        L+=1
+                        # print(L)
+                        if L>=v.size:
+                            out = True
+                            print(f'Warning!. Need more results to adhere to bias requirement for e2= {e2}')
+                            break
+                        N = np.append(N,0)
+                        E = np.append(E,bias[L])
+                        V = np.append(V,var2[L])
+                        C = np.append(C,cost2[L])
+                        N += np.maximum(0,np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64))
+                        test = (np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2))
+                    if not out:
+                        df = pd.DataFrame({'E':E,'V':V,'V[Y]':V/N,'C':C,'N':N,'N C':C*N,'dt':dt_list[i-1:min(L,v.size-1)]})
+                        df = df.append(pd.DataFrame({'E':np.sum(E),'V':' ','V[Y]':[np.sum(V/N)],'C':[np.sum(C)],'N':' ','N C':[np.dot(C,N)],'dt':' '}),ignore_index=True)
+                        # print(df)
+                        dfs[e2] = df
+                # print(dfs)
+                print(L)
+                '''Plotting number of paths and computational costs as functions of MSE'''
+                fig, (ax1, ax2) = plt.subplots(1, 2)
+                N = []
+                Cost = []
+                end = len(dfs)
+                start = end-6
+                for e2 in E2[start:end]:
+                    N += [dfs[e2]['N'][:-1]]
+                    Cost += [dfs[e2]['N C'][N[-1].size]]
+                    # print(Cost)
+                    ax1.plot(range(N[-1].size),N[-1],label=r'$E^2 = ${:.2E}'.format(e2))
+                ax2.loglog(E2[start:end],Cost,label='KD')
+                c4 = np.mean(Cost*E2[start:end])
+                c4 *= 2
+                ax2.plot(E2[start:end],c4*1/E2[start:end],label= r'$\mathcal{O}(E^{-2})$')
+                ax1.set_yscale('log')
+                ax2.set_xlabel(r'$E^2$')
+                ax2.set_ylabel(r'Total costs')
+                ax1.set_xlabel(r'Levels')
+                ax1.set_ylabel(r'Paths')
+                ax2.legend()
+                ax1.legend()
+                plt.show()
+
 
                 fig,ax = plt.subplots()
                 ax.plot(dt_list[1:],var2[1:],':',label='var(F(X^f)-F(X^c))')
@@ -732,33 +785,11 @@ if __name__ == '__main__':
         else:
             if N is None:
                 N = 120_000
-            N0=2000; T=1; dt_list = T/2**np.arange(0,17,1); t0=0
+            N0=32; T=1; dt_list = T/2**np.arange(0,17,1); t0=0
             if args.save_file:
                 logfile = open(f'logfile_KD_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            print('Testing consistency')
-            # x_KD=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
-            # dist = pd.DataFrame(data={'x':x_KD,'Method':['KD' for _ in range(N)]})
-            # print('Done with KMC')
-            # x_AP = SMC_par((T-t0)/2**13,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
-            # print(f'x_ap^2: {np.mean(x_AP**2)}, x_KD^2 = {np.mean(x_KD**2)}')
-            # dist = dist.append(pd.DataFrame(data={'x':x_AP,'Method':['Splitting' for _ in range(N)]}))
-            # print(wasserstein_distance(x_AP,x_KD))
-            # sns.kdeplot(data=dist, x="x",hue='Method',cut=0,common_norm=False)
-            # plt.show()
-            # x1 = KDMC(1/2**12,N,Q,t0,T,mu,sigma,M,R,SC,dR=dR,boundary=boundary)
-            # x1 = KMC(N,Q,t0,T,mu,sigma,M,R,SC)
-            # print(np.mean(x1**2))
-            # x2 = SMC(1/2**12,t0,T,N,epsilon,Q_nu,M_nu,boundary,r)
-            # x2 = APSMC_par(1/2**19,t0,T,N,epsilon,Q_nu,M_nu,boundary,r,rev=rev,diff=diff,v_ms=v_ms)
-            # print(np.mean(x2**2))
-            # print(f'wasserstein_distance: {wasserstein_distance(x1,x2)}')
-            # dist = pd.DataFrame(data={'x':x1,'Method':['KMC' for _ in range(N)]})
-            # # sns.kdeplot(data=dist, x="x",label='KMC')
-            # dist = dist.append(pd.DataFrame(data={'x':x2, 'Method':['SMC' for _ in range(N)]}))
-            # sns.kdeplot(data=dist, x="x",hue='Method',common_norm=False)
-            # plt.show()
             if type=='comp':
                 KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,complexity=True,convergence=False)
             elif type=='conv':
@@ -767,7 +798,6 @@ if __name__ == '__main__':
                 KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,complexity=True,convergence=True)
             else:
                 sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
-
     if goldstein_taylor:
         if N is None:
             N=120_000;
@@ -1031,7 +1061,14 @@ if __name__ == '__main__':
                 logfile = open(f'logfile_KD_level_selection_for_a={a}_b={b}_epsilon={epsilon}.txt','w')
             else:
                 logfile=None
-            KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,boundary=boundary,complexity=False)
+            if type=='comp':
+                KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,complexity=True,convergence=False)
+            elif type=='conv':
+                KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,complexity=False,convergence=True)
+            elif type=='both':
+                KDML_test(N,N0,dt_list,E2,epsilon,Q,t0,T,mu,sigma,M,R,SC,F,logfile,R_anti=R_anti,dR=dR,complexity=True,convergence=True)
+            else:
+                sys.exit('ERROR: Invalid input. When asked, you should give either of these three inputs: "comp", "conv" or "both" without apostrophe.')
     if diffusion_limit:
         '''
         epsilon= [1,0.32,0.1,0.032,0.01,0.005]

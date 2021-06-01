@@ -33,22 +33,6 @@ def select_levels_data(V,V_d,t0,T,L_max=4):
         if V_d[j]<V_min/2:
             levels =np.append(levels,[j+1])
             V_min = V_d[j]
-    # L_set = np.array(levels)
-    # '''Set up output variables based on level selection and set values of non adjecant levels to zero'''
-    # V_out = np.empty(len(L_set)) #Variances of estimates on each level
-    # V_out[0] = V[levels[0]] #Values for first level
-    # '''Note that len(Q_l_l1)=L and len(Q_l)=L+1. So the first value in Q_l_l1 is Q_{1,0}.
-    # Hence, if level 2 and 3 are included we want Q_{3,2}, which is at Q_l_l1[2]
-    # '''
-    # '''First determine jumps in levels'''
-    # jumps = np.where(diff_np(L_set)>1)[0] #index for jumps in terms of correlated results
-    # V_temp = V_d[L_set[1:]-1]
-    # '''No results are available for non-adjecant levels. So they are set to 0'''
-    # V_temp[jumps] = 0
-    # '''Insert in output variables'''
-    # V_out[1:] = V_temp #Values for other levels
-    # '''Set number of paths for each level'''
-    # return L_set,V_out
     return levels
 
 
@@ -181,9 +165,9 @@ def rnd1(x, decimals, out):
     return np.round_(x, decimals, out)#.astype(np.int64)
 
 
-@njit(nogil=True,parallel=True)
+# @njit(nogil=True,parallel=True)
 def update_path(I,E,SS,C,N,N_diff,levels,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,boundary,update = True):
-    cores = 1 if update else 8
+    cores = 1# if update else 8
     n = np.maximum(2,rnd1(N_diff/cores,0,np.empty_like(N_diff/cores)).astype(np.int64))
     # n = np.ones(2,dtype=np.int64)*2#np.maximum(np.ones(N_diff.size)*2,np.round(N_diff/cores,0,np.empty_like(N_diff/cores))).astype(np.int64)
     # for i,Nd in enumerate(N_diff):
@@ -235,17 +219,18 @@ def lin_fit(x,y):
 # @njit(nogil=True)
 def ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,tau=None,L=14,N_warm = 100,boundary=None,alpha = None,beta=None,gamma=None,levels=None):
     '''First do warm-up and select levels with L being the maximum level'''
-    if levels is None:
+    if levels is not None:
+        L_num = len(levels)
+        N = np.zeros(L_num,dtype=np.int64)
+        E = np.zeros(L_num);V = np.zeros(L_num); C = np.zeros(L_num)
+    else:
         levels,N,E,V,C = select_levels(L,Q,t0,T,mu,sigma,M,R,SC,F,R_anti,dR,N_warm,tau)
         '''Number of levels to use'''
         L_num = len(levels)
-    else:
-        L_num = levels.size
-        L_start = L_num
-        N = np.zeros(L_num,dtype=np.int64)
-        E = np.zeros(L_num);V = np.zeros(L_num); C = np.zeros(L_num)
+    L_start = L_num
+
     '''Variances will be updated and saved as sum of squares'''
-    SS = (N-1)*V
+    SS = np.maximum(0,(N-1)*V)
     '''Paths still needed to minimize total cost based on current information on variance and cost for each level'''
     N_diff = np.ones(L_num,dtype=np.int64)*N_warm - N
     # print(f'N_diff: {N_diff}')
@@ -263,7 +248,7 @@ def ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=None,dR=None,tau=None,L=14,N_warm = 10
             N_diff = np.maximum(0,np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64) - N)
             if L_num > L_start and alpha is not None and False:
                 '''Find problematic/erratic bias values and require more paths for levels
-                with eratic bias values'''
+                with eratic bias values. Deprecated part of function'''
                 # index_bias = np.where((np.abs(E[L_start-1:-1])/np.abs(E[L_start:])< 2**(alpha/2)))[0] + 1
                 index_bias = np.where((np.abs(E[L_start-1:-1])/np.abs(E[L_start:])< 1))[0] + 1
                 index_bias = np.unique(np.append(index_bias,index_bias+1))
@@ -479,33 +464,107 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         # levels = np.array([0,1,12,13]) One coarse level
         levels = np.array([6,7],dtype=np.int64)
         # levels = np.array([3,4],dtype=np.int64)
-        # Projected cost based on Multilevel Theorem
-        cost_e=0; l = 1
-        e2 = 1/2**l
-        WC = []
-        print('Compile')
-        # ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.15,beta=3.0,gamma=0.0,levels=levels)
-        print('Compilation done')
-        while cost_e<3000:
-            print(f'MSE= {e2}')
-            start = time.perf_counter()
-            E,V,C,N,levels_out = ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.15,levels=levels)
-            WC +=[time.perf_counter()-start]
-            data[e2] = {'dt':(T-t0)/2**levels_out,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
-            df = pd.DataFrame(data[e2])
-            df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in data[e2]['E']])],'V_l':' ','V[E]':[np.sum([v for v in data[e2]['V[E]']])],'C_l':[np.sum([c for c in data[e2]['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(data[e2]['N_l'],data[e2]['C_l']))]}))
-            print(df)
+        # levels=None
+        if convergence:
+            '''Find index where they transition'''
+            i = 0
+            old = 0
+            for va in var2[1:]:
+                if va < old:
+                    break
+                i+=1
+                old=va
+            print(f'slope of variance before:{np.polyfit(range(1,i-2),np.log2(np.abs(var2[1:i-2])),1)}')
+            print(f'slope of variance after:{np.polyfit(range(i+2,var2.size),np.log2(np.abs(var2[i+2:])),1)}')
+            print(f'slope of bias before:{np.polyfit(range(1,i-2),np.log2(np.abs(bias[1:i-2])),1)}')
+            alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(bias[i:])),1)[0]
+            print(f'slope of bias after:{alpha}')
+            print(f'slope of cost:{np.polyfit(range(i,cost2.size),np.log2(np.abs(cost2[i:])),1)}')
+            '''Complexity test based on estimations in convergence test'''
+            dfs = {}
+            pd.set_option('display.float_format', '{:.2E}'.format)
+            for e2 in E2:
+                L=4 + i
+                E = np.append(v[i],bias[i:L])
+                V = np.append(var1[i],var2[i:L])
+                C = np.append(cost1[i],cost2[i:L])
+                N = np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C)))
+                test = (np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2))
+                out=False
+                while not test:
+                    L+=1
+                    # print(L)
+                    if L>=v.size:
+                        out = True
+                        print(f'Warning!. Need more results to adhere to bias requirement for e2= {e2}')
+                        break
+                    N = np.append(N,0)
+                    E = np.append(E,bias[L])
+                    V = np.append(V,var2[L])
+                    C = np.append(C,cost2[L])
+                    N += np.maximum(0,np.ceil(2/e2*np.sqrt(V/C)*np.sum(np.sqrt(V*C))).astype(np.int64))
+                    test = (np.max(np.abs(E[-3:]))/(2**alpha-1) < np.sqrt(e2/2))
+                if not out:
+                    df = pd.DataFrame({'E':E,'V':V,'V[Y]':V/N,'C':C,'N':N,'N C':C*N,'dt':dt_list[i-1:min(L,v.size-1)]})
+                    df = df.append(pd.DataFrame({'E':np.sum(E),'V':' ','V[Y]':[np.sum(V/N)],'C':[np.sum(C)],'N':' ','N C':[np.dot(C,N)],'dt':' '}),ignore_index=True)
+                    # print(df)
+                    dfs[e2] = df
+            # print(dfs)
+            print(L)
+            '''Plotting number of paths and computational costs as functions of MSE'''
+            fig, (ax1, ax2) = plt.subplots(1, 2)
+            N = []
+            Cost = []
+            end = len(dfs)
+            start = end-min(end,6)
+            for e2 in E2[start:end]:
+                N += [dfs[e2]['N'][:-1]]
+                Cost += [dfs[e2]['N C'][N[-1].size]]
+                # print(Cost)
+                ax1.plot(range(N[-1].size),N[-1],label=r'$E^2 = ${:.2E}'.format(e2))
+            ax2.loglog(E2[start:end],Cost,label='KD')
+            c4 = np.mean(Cost*E2[start:end])
+            c4 *= 2
+            ax2.plot(E2[start:end],c4*1/E2[start:end],label= r'$\mathcal{O}(E^{-2})$')
+            ax1.set_yscale('log')
+            ax2.set_xlabel(r'$E^2$')
+            ax2.set_ylabel(r'Total costs')
+            ax1.set_xlabel(r'Levels')
+            ax1.set_ylabel(r'Paths')
+            ax2.legend()
+            ax1.legend()
             if save_file:
-                name = f'resultfile_complexity_{e2}'+logfile.name[7:]
-                df.to_csv(name,index=False)
-                logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {(T-t0)/2**levels_out} \n")
-            #Actual simulation cost
-            cost_s = np.dot(C,N)
-            #Constant from Theorem
-            c4 = cost_s*e2
-            l+=1
+                filename = f'complexity_results'+logfile.name[7:]
+                plt.savefig(filename)
+
+        else:
+            # Projected cost based on Multilevel Theorem
+            cost_e=0; l = 1
             e2 = 1/2**l
-            cost_e = c4/e2
+            WC = []
+            print('Compile')
+            ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.15,beta=3.0,gamma=0.0,levels=levels)
+            print('Compilation done')
+            while cost_e<3000:
+                print(f'MSE= {e2}')
+                start = time.perf_counter()
+                E,V,C,N,levels_out = ml(e2,Q,t0,T,mu,sigma,M,R,SC,F,R_anti=R_anti,dR=dR,tau=tau,L=14,N_warm=N0,boundary=boundary,alpha=1.30,levels=levels)
+                WC +=[time.perf_counter()-start]
+                data[e2] = {'dt':(T-t0)/2**levels_out,'N_l':N,'E':E,'V_l':V,'V[E]':V/N,'C_l':C,'N_l C_l':N*C}
+                df = pd.DataFrame(data[e2])
+                df = df.append(pd.DataFrame({'dt':' ','N_l':' ','E':[np.sum([e for e in data[e2]['E']])],'V_l':' ','V[E]':[np.sum([v for v in data[e2]['V[E]']])],'C_l':[np.sum([c for c in data[e2]['C_l']])],'N_l C_l':[np.sum(n*c for n,c in zip(data[e2]['N_l'],data[e2]['C_l']))]}))
+                print(df)
+                if save_file:
+                    name = f'resultfile_complexity_{e2}'+logfile.name[7:]
+                    df.to_csv(name,index=False)
+                    logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {(T-t0)/2**levels_out} \n")
+                #Actual simulation cost
+                cost_s = WC[-1]#np.dot(C,N)
+                #Constant from Theorem
+                c4 = cost_s*e2
+                l+=1
+                e2 = 1/2**l
+                cost_e = c4/e2
 
         if save_file:
             name = f'wall_clock_time_{e2}'+logfile.name[7:]
@@ -535,14 +594,17 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
         plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
         plt.plot(dt_list,v,'--',color = plt.gca().lines[-1].get_color(),label='mean(F(X))')
-        plt.title(f'Plot of variance and bias')
+        # plt.title(f'Plot of variance and bias')
         plt.xscale('log')
         plt.yscale('log')
         plt.legend()
+        if save_file:plt.savefig(f'var_bias'+logfile.name[7:])
         plt.figure()
         plt.plot(range(1,L),kur1[1:],':',label='kurtosis')
         plt.title(f'Plot of kurtosis')
+        if save_file:plt.savefig(f'kurtosis'+logfile.name[7:])
         plt.figure()
         plt.plot(range(1,L),cons[1:],':',label='kurtosis')
         plt.title(f'Plot check of consistency')
-        plt.show()
+        if save_file:plt.savefig(f'consistency_check'+logfile.name[7:])
+        if not save_file:plt.show()

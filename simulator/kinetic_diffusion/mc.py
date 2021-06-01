@@ -18,9 +18,7 @@ def __put_copy(self,arr,index,new):
 
 #The KDMC method with the use of a step function
 @njit(nogil=True)
-def KDMC(dt,N,Q,t0,T,mu:Callable[[np.ndarray],np.ndarray],sigma:Callable[[np.ndarray],np.ndarray],
-M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:Callable[[int],np.ndarray],
-Nested =False,dR=None,boundary=None,x0=None,v0=None):
+def KDMC(dt,N,Q,t0,T,mu,sigma,M,R,SC,Nested =False,dR=None,boundary=None,x0=None,v0=None):
     '''
     dt: step size
     x0: initial positions
@@ -97,7 +95,7 @@ M:Callable[[np.ndarray,int],np.ndarray],R:Callable[[np.ndarray],np.ndarray],SC:C
 
 @njit(nogil=True,parallel=True)
 def mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
-    cores = 64
+    cores = 8
     n = round(N/cores)
     x_KD = np.empty((cores,n))
     for i in prange(cores):
@@ -109,7 +107,7 @@ def mc1_par(dt,N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
 
 @njit(nogil=True,parallel=True)
 def mc2_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary,x0=None,v0=None):
-    cores = 64
+    cores = 8
     n = round(N/cores)
     x_std = np.empty((cores,n))
     for i in prange(cores):
