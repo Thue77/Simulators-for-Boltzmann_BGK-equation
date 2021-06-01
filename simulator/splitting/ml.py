@@ -304,7 +304,7 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
             old=va
         alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(b[i:])),1)[0]
         beta = -np.polyfit(range(i,var2.size),np.log2(np.abs(var2[i:])),1)[0]
-        alpha = np.polyfit(range(i,var2.size),np.log2(np.abs(cost2[i:])),1)[0]
+        gamma = np.polyfit(range(i,var2.size),np.log2(np.abs(cost2[i:])),1)[0]
         print(f'alpha= {alpha}, beta = {beta}, gamma= {gamma}')
         if save_file:
             np.savetxt('resultfile'+logfile.name[7:],(dt_list,v,b,var1,var2,cost1,cost2,kur1,cons))

@@ -439,7 +439,7 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             old=va
         alpha = -np.polyfit(range(i,var2.size),np.log2(np.abs(b[i:])),1)[0]
         beta = -np.polyfit(range(i,var2.size),np.log2(np.abs(var2[i:])),1)[0]
-        alpha = np.polyfit(range(i,var2.size),np.log2(np.abs(cost2[i:])),1)[0]
+        gamma = np.polyfit(range(i,var2.size),np.log2(np.abs(cost2[i:])),1)[0]
         # L1 = np.where(dt_list<1/R(0))[0][1]
         # pa = np.polyfit(range(L1,L),np.log2(np.abs(b[L1:L])),1); alpha = -pa[0]
         # pb = np.polyfit(range(L1,L),np.log2(np.abs(var2[L1:L])),1); beta = -pb[0]
