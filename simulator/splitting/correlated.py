@@ -5,7 +5,7 @@ from numba import njit,jit_module
 from numba import prange
 import sys
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False,v_ms=1):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
@@ -42,7 +42,7 @@ def correlated(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False,v_
         x_c,v_c,_ = phi_APS(x_c,v_c,dt_c,eps,z_c,u_c,B,r=r,v_next=v_bar_c,boundary=boundary,diff=diff,v_ms=v_ms)
         t += dt_c
     return x_f,x_c
-@njit(nogil=True)
+# @njit(nogil=True)
 def improved_corr(dt_f,M_t,eps,x_f,x_c,v_all,v_c,z,r,first_level):
     '''Correlates brownian numbers based on article "Multilevel Monte Carlo with
     Improved Correlation for Kinetic Equations in Diffusive Scaling" '''
@@ -67,7 +67,7 @@ def improved_corr(dt_f,M_t,eps,x_f,x_c,v_all,v_c,z,r,first_level):
 
 
 '''My correlation with inspiration from strang splitting'''
-@njit(nogil=True)
+# @njit(nogil=True)
 def correlated_ts(dt_f,M_t,t,T,eps,N,Q,B,r,boundary=None,strategy = 1,diff=False,std=False):
     '''
     M_t: defined s.t. dt_c=M_t dt_f
@@ -174,12 +174,12 @@ def cor_rv(M_t,Z,C,v_bar_all):
     # print(f'output: {np.sum(np.sqrt(theta)*v_bar_all,axis=1)}')
 
     return np.sum(np.sqrt(theta)*v_bar_all,axis=1),z
-@njit(nogil=True)
+# @njit(nogil=True)
 def rnd1(x, decimals, out):
     return np.round_(x, decimals, out).astype(np.int64)
 
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def new(M_t,Z,v_bar_all):
     n = v_bar_all.shape[0]
     # remainder = np.mod(n,np.arange(2,9))
@@ -233,10 +233,9 @@ def new(M_t,Z,v_bar_all):
         out=np.zeros(n)
         out_z=np.sqrt(1/M_t)*np.sum(Z,axis=1)
         out[rows] = np.sqrt(1/np.sum(C[rows],axis=1))*np.sum(v_bar_all[rows],axis=1)
-        # out_z[rows] = 1/np.sqrt(2)*(np.sqrt(1/np.sum(C[rows],axis=1))*np.sum(v_bar_all[rows],axis=1)+np.sqrt(1/M_t)*np.sum(Z[rows],axis=1))
         return out,out_z
 
-@njit(nogil=True)
+# @njit(nogil=True)
 def put_np(count,temp,M_t):
     # print(f'temp: {temp}')
     for i in range(count.shape[0]):
@@ -248,7 +247,7 @@ def put_np(count,temp,M_t):
             start = start + temp[i,j]
 
 
-
+jit_module(nopython=True,nogil=True)
 
 
 
