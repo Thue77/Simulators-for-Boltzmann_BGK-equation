@@ -826,7 +826,7 @@ if __name__ == '__main__':
         if N%8!=0 or N%80!=0:
             sys.exit('Please provide a number of paths divisible by 8 and 80')
         N0=40; T=1; dt_list = T/2**np.arange(0,17,1); t0=0; M_t=2
-        if True:
+        if False:
             print('Testing consistency')
             x_KD=KMC_par(N,Q,t0,T,mu,sigma,M,R,SC,dR,boundary)
             dist = pd.DataFrame(data={'x':x_KD,'Method':['KD' for _ in range(N)]})
