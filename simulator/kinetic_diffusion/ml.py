@@ -392,8 +392,8 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         logfile.write("\n")
         logfile.write("*********************************************************\n")
         logfile.write("*** Experiemnt setup  ***\n")
-        logfile.write("*** S(x,v) = 1/sqrt(2*pi)*v^2*e^{-v^2/2}*(1+cos(2*pi*(x+1/2))) ***\n")
-        logfile.write(f"*** R(x) = 1/eps^2 (ax+b), with a={eps**2*(R(1)-R(0))}, b={R(0)*eps**2} and eps = {eps}  ***\n")
+        logfile.write("*** S(x,v) = 1/sqrt(2pi)e^{-v^2/2}(1+cos(2pi(x+1/2))) ***\n")
+        logfile.write(f"*** R(x) = 1/eps^2((-a(x-0.5)+b)(x<=0.5) + (a(x-0.5)+b)(x>0.5)), with a={eps**2*(R(1)-R(0))}, b={R(0)*eps**2} and eps = {eps}  ***\n")
         if 2!=F(np.array([2])):
             logfile.write(f"*** OBS!! replace this text with specification of quantity of interest F(3) = {F(np.array([3]))} ***\n")
         else:
