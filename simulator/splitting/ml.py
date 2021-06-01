@@ -387,6 +387,8 @@ def ml_test(N,N0,dt_list,E2,Q,t0,T,M_t,eps,M,r,F,logfile,boundary=None,strategy=
                         name = f'resultfile_complexity_{e2}'+logfile.name[7:]
                         df.to_csv(name,index=False)
                         logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {dt_list[i-1:min(L,v.size-1)]} \n")
+                else:
+                    break
             '''Plotting number of paths and computational costs as functions of MSE'''
             fig, (ax1, ax2) = plt.subplots(2, 1)
             N = []
