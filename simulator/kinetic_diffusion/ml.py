@@ -453,16 +453,16 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             logfile.write("*********************************************************\n")
             logfile.write(" e2 value mlmc_cost N_l dt \n")
             logfile.write("---------------------------------------------------------\n")
-        if convergence:
-            levels = select_levels_data(var1,var2[1:],t0,T)
-            print(f'Levels selected: {levels}')
+        # if convergence:
+            # levels = select_levels_data(var1,var2[1:],t0,T)
+            # print(f'Levels selected: {levels}')
         else:
             levels=None
 
         data = {}
         pd.set_option('max_columns',None)
         # levels = np.array([0,1,12,13]) One coarse level
-        levels = np.array([6,7],dtype=np.int64)
+        # levels = np.array([6,7],dtype=np.int64)
         # levels = np.array([3,4],dtype=np.int64)
         # levels=None
         if convergence:
@@ -509,10 +509,14 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                     df = df.append(pd.DataFrame({'E':np.sum(E),'V':' ','V[Y]':[np.sum(V/N)],'C':[np.sum(C)],'N':' ','N C':[np.dot(C,N)],'dt':' '}),ignore_index=True)
                     # print(df)
                     dfs[e2] = df
-            # print(dfs)
-            print(L)
+                    if save_file:
+                        name = f'resultfile_complexity_{e2}'+logfile.name[7:]
+                        df.to_csv(name,index=False)
+                        logfile.write(f" {e2} {np.sum(E)} {np.dot(C,N)} {N} {dt_list[i-1:min(L,v.size-1)]} \n")
+                else:
+                    break
             '''Plotting number of paths and computational costs as functions of MSE'''
-            fig, (ax1, ax2) = plt.subplots(1, 2)
+            fig, (ax1, ax2) = plt.subplots(2, 1)
             N = []
             Cost = []
             end = len(dfs)
@@ -522,7 +526,7 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
                 Cost += [dfs[e2]['N C'][N[-1].size]]
                 # print(Cost)
                 ax1.plot(range(N[-1].size),N[-1],label=r'$E^2 = ${:.2E}'.format(e2))
-            ax2.loglog(E2[start:end],Cost,label='KD')
+            ax2.loglog(E2[start:end],Cost)
             c4 = np.mean(Cost*E2[start:end])
             c4 *= 2
             ax2.plot(E2[start:end],c4*1/E2[start:end],label= r'$\mathcal{O}(E^{-2})$')
@@ -531,11 +535,13 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
             ax2.set_ylabel(r'Total costs')
             ax1.set_xlabel(r'Levels')
             ax1.set_ylabel(r'Paths')
-            ax2.legend()
+            # ax2.legend()
             ax1.legend()
             if save_file:
-                filename = f'complexity_results'+logfile.name[7:]
-                plt.savefig(filename)
+                filename = f'complexity_results'+logfile.name[7:-3]
+                fig.savefig(filename)
+            else:
+                plt.show()
 
         else:
             # Projected cost based on Multilevel Theorem
@@ -590,6 +596,7 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         logfile.close()
 
     if convergence:
+        plt.figure()
         plt.plot(dt_list[1:],var2[1:],':',label='var(F(x^f)-F(X^c))')
         plt.plot(dt_list,var1,'--',color = plt.gca().lines[-1].get_color(),label='var(F(X))')
         plt.plot(dt_list[1:],np.abs(b[1:]),':',label='mean(|F(x^f)-F(X^c)|)')
@@ -597,14 +604,15 @@ def ml_test(N,N0,dt_list,E2,eps,Q,t0,T,mu,sigma,M,R,SC,F,logfile=None,R_anti=Non
         # plt.title(f'Plot of variance and bias')
         plt.xscale('log')
         plt.yscale('log')
+        plt.xlim(max(dt_list),min(dt_list))
         plt.legend()
-        if save_file:plt.savefig(f'var_bias'+logfile.name[7:])
+        if save_file:plt.savefig(f'var_bias'+logfile.name[7:-3]+'png')
         plt.figure()
-        plt.plot(range(1,L),kur1[1:],':',label='kurtosis')
+        plt.plot(range(1,kur1.size),kur1[1:],':')
         plt.title(f'Plot of kurtosis')
-        if save_file:plt.savefig(f'kurtosis'+logfile.name[7:])
+        if save_file:plt.savefig(f'kurtosis'+logfile.name[7:-3]+'png')
         plt.figure()
-        plt.plot(range(1,L),cons[1:],':',label='kurtosis')
+        plt.plot(range(1,kur1.size),cons[1:],':')
         plt.title(f'Plot check of consistency')
-        if save_file:plt.savefig(f'consistency_check'+logfile.name[7:])
+        if save_file:plt.savefig(f'consistency_check'+logfile.name[7:-3]+'png')
         if not save_file:plt.show()

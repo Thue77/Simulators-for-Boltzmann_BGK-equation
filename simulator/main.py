@@ -703,10 +703,12 @@ if __name__ == '__main__':
                         df = df.append(pd.DataFrame({'E':np.sum(E),'V':' ','V[Y]':[np.sum(V/N)],'C':[np.sum(C)],'N':' ','N C':[np.dot(C,N)],'dt':' '}),ignore_index=True)
                         # print(df)
                         dfs[e2] = df
+                    else:
+                        break
                 # print(dfs)
                 print(L)
                 '''Plotting number of paths and computational costs as functions of MSE'''
-                fig, (ax1, ax2) = plt.subplots(1, 2)
+                fig, (ax1, ax2) = plt.subplots(2, 1)
                 N = []
                 Cost = []
                 end = len(dfs)
@@ -716,7 +718,7 @@ if __name__ == '__main__':
                     Cost += [dfs[e2]['N C'][N[-1].size]]
                     # print(Cost)
                     ax1.plot(range(N[-1].size),N[-1],label=r'$E^2 = ${:.2E}'.format(e2))
-                ax2.loglog(E2[start:end],Cost,label='KD')
+                ax2.loglog(E2[start:end],Cost)
                 c4 = np.mean(Cost*E2[start:end])
                 c4 *= 2
                 ax2.plot(E2[start:end],c4*1/E2[start:end],label= r'$\mathcal{O}(E^{-2})$')
@@ -725,7 +727,6 @@ if __name__ == '__main__':
                 ax2.set_ylabel(r'Total costs')
                 ax1.set_xlabel(r'Levels')
                 ax1.set_ylabel(r'Paths')
-                ax2.legend()
                 ax1.legend()
                 plt.show()
 
